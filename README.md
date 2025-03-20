@@ -1,6 +1,6 @@
-# QuickFood - Food Delivery Platform
+# QuickFood - Frontend
 
-QuickFood is a modern food delivery platform built with Next.js, allowing users to browse restaurants, order food, and track deliveries in real-time.
+QuickFood is a food delivery platform built with Next.js, allowing users to browse restaurants, order food, and track deliveries in real-time.
 
 ## Features
 
