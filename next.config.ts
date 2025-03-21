@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   /* config options here */
   images: {
-    domains: ['localhost', '*.onrender.com'],
+    domains: ['localhost', ''],
     remotePatterns: [
       {
         protocol: 'http',
@@ -11,10 +11,10 @@ const nextConfig: NextConfig = {
         port: '8000',
         pathname: '/media/**',
       },
-      // Add Render deployment
+  
       {
         protocol: 'https',
-        hostname: '*.onrender.com',
+        hostname: '',
         pathname: '/media/**',
       },
     ],
