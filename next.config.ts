@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   /* config options here */
   images: {
-    domains: ['localhost', ''],
+    domains: ['localhost', 'https://quickfood-backend-hoi3.onrender.com'],
     remotePatterns: [
       {
         protocol: 'http',
@@ -14,7 +14,7 @@ const nextConfig: NextConfig = {
   
       {
         protocol: 'https',
-        hostname: '',
+        hostname: 'https://quickfood-backend-hoi3.onrender.com',
         pathname: '/media/**',
       },
     ],
