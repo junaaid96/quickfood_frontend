@@ -2,6 +2,9 @@
 
 QuickFood is a food delivery platform built with Next.js, allowing users to browse restaurants, order food, and track deliveries in real-time.
 
+Live: https://quickfood-frontend.vercel.app/
+Backend repo: https://github.com/junaaid96/quickfood_backend
+
 ## Features
 
 - **User Authentication**: Register and login as a customer or restaurant owner
