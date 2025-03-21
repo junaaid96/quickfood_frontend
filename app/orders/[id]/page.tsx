@@ -64,7 +64,7 @@ export default function OrderTrackingPage() {
 
     if (loading) {
         return (
-            <div className="flex justify-center items-center h-64">
+            <div className="flex justify-center items-center h-64 text-gray-600">
                 Loading order details...
             </div>
         );
@@ -125,36 +125,40 @@ export default function OrderTrackingPage() {
                                     className={`w-8 h-8 mx-auto rounded-full flex items-center justify-center ${
                                         statusStep >= 1
                                             ? "bg-orange-500 text-white"
-                                            : "bg-gray-200"
+                                            : "bg-gray-500"
                                     }`}
                                 >
                                     1
                                 </div>
-                                <div className="text-xs mt-1">Pending</div>
+                                <div className="text-xs mt-1 text-gray-600">
+                                    Pending
+                                </div>
                             </div>
                             <div className="text-center">
                                 <div
                                     className={`w-8 h-8 mx-auto rounded-full flex items-center justify-center ${
                                         statusStep >= 2
                                             ? "bg-orange-500 text-white"
-                                            : "bg-gray-200"
+                                            : "bg-gray-500"
                                     }`}
                                 >
                                     2
                                 </div>
-                                <div className="text-xs mt-1">Preparing</div>
+                                <div className="text-xs mt-1 text-gray-600">
+                                    Preparing
+                                </div>
                             </div>
                             <div className="text-center">
                                 <div
                                     className={`w-8 h-8 mx-auto rounded-full flex items-center justify-center ${
                                         statusStep >= 3
                                             ? "bg-orange-500 text-white"
-                                            : "bg-gray-200"
+                                            : "bg-gray-500"
                                     }`}
                                 >
                                     3
                                 </div>
-                                <div className="text-xs mt-1">
+                                <div className="text-xs mt-1 text-gray-600">
                                     Out for Delivery
                                 </div>
                             </div>
@@ -163,12 +167,14 @@ export default function OrderTrackingPage() {
                                     className={`w-8 h-8 mx-auto rounded-full flex items-center justify-center ${
                                         statusStep >= 4
                                             ? "bg-orange-500 text-white"
-                                            : "bg-gray-200"
+                                            : "bg-gray-500"
                                     }`}
                                 >
                                     4
                                 </div>
-                                <div className="text-xs mt-1">Delivered</div>
+                                <div className="text-xs mt-1 text-gray-600">
+                                    Delivered
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -256,27 +262,30 @@ export default function OrderTrackingPage() {
                         <h3 className="text-lg font-medium text-gray-900 mb-2">
                             Items
                         </h3>
-                        <div className="border-t border-gray-200">
+                        <div className="border-t border-gray-300">
                             {order.items?.map((item, index) => (
                                 <div
                                     key={index}
                                     className="py-3 flex justify-between border-b border-gray-200"
                                 >
                                     <div>
-                                        <span className="font-medium">
+                                        <span className="font-medium text-gray-600">
                                             {item.quantity}x{" "}
                                         </span>
-                                        <span>
+                                        <span className="text-gray-600">
                                             {item.menu_item_details?.name}
                                         </span>
                                     </div>
-                                    <span className="text-gray-900">
-                                        $ ${Number(item.price) * item.quantity}
+                                    <span className="text-gray-600">
+                                        $
+                                        {(
+                                            Number(item.price) * item.quantity
+                                        ).toFixed(2)}
                                     </span>
                                 </div>
                             ))}
                         </div>
-                        <div className="py-3 flex justify-between font-bold">
+                        <div className="py-3 flex justify-between font-bold text-gray-800">
                             <span>Total</span>
                             <span>${order.total_price}</span>
                         </div>

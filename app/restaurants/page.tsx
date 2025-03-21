@@ -34,7 +34,7 @@ export default function RestaurantsPage() {
 
     if (loading) {
         return (
-            <div className="flex justify-center items-center h-64">
+            <div className="flex justify-center items-center h-64 text-gray-600">
                 Loading restaurants...
             </div>
         );
@@ -50,7 +50,7 @@ export default function RestaurantsPage() {
                     <input
                         type="text"
                         placeholder="Search restaurants by name or location..."
-                        className="w-full p-3 border border-gray-300 rounded-lg"
+                        className="w-full p-3 border border-gray-300 rounded-lg text-gray-600"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -89,10 +89,11 @@ export default function RestaurantsPage() {
                                 <div className="relative h-48 w-full">
                                     {restaurant.image ? (
                                         <Image
-                                            src={`http://localhost:8000${restaurant.image}`}
+                                            src={restaurant.image}
                                             alt={restaurant.name}
                                             fill
                                             className="object-cover"
+                                            unoptimized={true}
                                         />
                                     ) : (
                                         <div className="bg-gray-200 h-full w-full flex items-center justify-center">

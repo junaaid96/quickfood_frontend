@@ -71,7 +71,7 @@ export default function OrderConfirmationPage() {
 
     if (loading) {
         return (
-            <div className="flex justify-center items-center h-64">
+            <div className="flex justify-center items-center h-64 text-gray-600">
                 Loading order details...
             </div>
         );
@@ -100,33 +100,42 @@ export default function OrderConfirmationPage() {
                         <h3 className="text-lg font-medium text-gray-900 mb-2">
                             Items
                         </h3>
-                        <div className="border-t border-gray-200">
+                        <div className="border-t border-gray-300">
                             {pendingOrder.items?.map((item, index) => {
-                                const menuItem = restaurant?.menu_items.find(mi => mi.id === item.menu_item);
-                                
+                                const menuItem = restaurant?.menu_items.find(
+                                    (mi) => mi.id === item.menu_item
+                                );
+
                                 return (
                                     <div
                                         key={index}
-                                        className="py-3 flex justify-between border-b border-gray-200"
+                                        className="py-3 flex justify-between border-b border-gray-300"
                                     >
                                         <div>
-                                            <span className="font-medium">
+                                            <span className="font-medium text-gray-600">
                                                 {item.quantity}x{" "}
                                             </span>
-                                            <span>
-                                                {menuItem?.name || `Item #${item.menu_item}`}
+                                            <span className="text-gray-600">
+                                                {menuItem?.name ||
+                                                    `Item #${item.menu_item}`}
                                             </span>
                                         </div>
-                                        <span className="text-gray-900">
-                                            ${Number(item.price) * item.quantity}
+                                        <span className="text-gray-600">
+                                            $
+                                            {(
+                                                Number(item.price) *
+                                                item.quantity
+                                            ).toFixed(2)}
                                         </span>
                                     </div>
                                 );
                             })}
                         </div>
-                        <div className="py-3 flex justify-between font-bold">
+                        <div className="py-3 flex justify-between font-bold text-gray-800">
                             <span>Total</span>
-                            <span>${pendingOrder.total_price}</span>
+                            <span>
+                                ${Number(pendingOrder.total_price).toFixed(2)}
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -172,7 +181,6 @@ export default function OrderConfirmationPage() {
                                 required
                             />
                         </div>
-                        
                     </div>
                 </div>
             </div>

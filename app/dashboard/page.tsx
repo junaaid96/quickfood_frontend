@@ -10,12 +10,14 @@ import { Restaurant, Order } from "@/lib/types";
 
 export default function DashboardPage() {
     const router = useRouter();
-    const { user, isAuthenticated, isRestaurantOwner } = useAuth();
+    const { user, isAuthenticated, isRestaurantOwner, isLoading: authLoading } = useAuth();
     const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        if (authLoading) return;
+
         if (!isAuthenticated) {
             router.push("/login?redirect=/dashboard");
             return;
@@ -63,7 +65,18 @@ export default function DashboardPage() {
         }
 
         fetchData();
-    }, [isAuthenticated, isRestaurantOwner, router, user]);
+    }, [isAuthenticated, isRestaurantOwner, router, user, authLoading]);
+
+    if (authLoading) {
+        return (
+            <div className="flex justify-center items-center h-screen">
+                <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-orange-500"></div>
+                <span className="ml-4 text-xl font-medium text-gray-700">
+                    Checking authentication...
+                </span>
+            </div>
+        );
+    }
 
     if (loading) {
         return (
@@ -115,10 +128,11 @@ export default function DashboardPage() {
                                             <div className="relative h-32 w-32 flex-shrink-0">
                                                 {restaurant.image ? (
                                                     <Image
-                                                        src={`http://localhost:8000/${restaurant.image}`}
+                                                        src={restaurant.image}
                                                         alt={restaurant.name}
                                                         fill
                                                         className="object-cover"
+                                                        unoptimized={true}
                                                     />
                                                 ) : (
                                                     <div className="bg-gray-200 h-full w-full flex items-center justify-center">

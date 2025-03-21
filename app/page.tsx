@@ -45,7 +45,7 @@ export default function HomePage() {
                             <div className="w-16 h-16 bg-orange-100 text-orange-500 rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">
                                 1
                             </div>
-                            <h3 className="text-xl font-semibold mb-2">
+                            <h3 className="text-xl font-semibold mb-2 text-gray-900">
                                 Choose a Restaurant
                             </h3>
                             <p className="text-gray-600">
@@ -58,7 +58,7 @@ export default function HomePage() {
                             <div className="w-16 h-16 bg-orange-100 text-orange-500 rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">
                                 2
                             </div>
-                            <h3 className="text-xl font-semibold mb-2">
+                            <h3 className="text-xl font-semibold mb-2 text-gray-900">
                                 Select Your Meal
                             </h3>
                             <p className="text-gray-600">
@@ -71,7 +71,7 @@ export default function HomePage() {
                             <div className="w-16 h-16 bg-orange-100 text-orange-500 rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">
                                 3
                             </div>
-                            <h3 className="text-xl font-semibold mb-2">
+                            <h3 className="text-xl font-semibold mb-2 text-gray-900">
                                 Enjoy Your Delivery
                             </h3>
                             <p className="text-gray-600">

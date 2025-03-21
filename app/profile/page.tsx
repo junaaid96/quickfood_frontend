@@ -7,7 +7,7 @@ import { authApi } from "@/lib/api";
 
 export default function ProfilePage() {
     const router = useRouter();
-    const { user, isAuthenticated, logout } = useAuth();
+    const { isAuthenticated, logout, isLoading: authLoading } = useAuth();
     const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState(false);
     const [profile, setProfile] = useState({
@@ -23,6 +23,8 @@ export default function ProfilePage() {
     const [success, setSuccess] = useState("");
 
     useEffect(() => {
+        if (authLoading) return;
+
         if (!isAuthenticated) {
             router.push("/login?redirect=/profile");
             return;
@@ -75,6 +77,17 @@ export default function ProfilePage() {
             setUpdating(false);
         }
     };
+
+    if (authLoading) {
+        return (
+            <div className="flex justify-center items-center h-screen">
+                <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-orange-500"></div>
+                <span className="ml-4 text-xl font-medium text-gray-700">
+                    Checking authentication...
+                </span>
+            </div>
+        );
+    }
 
     if (loading) {
         return (
@@ -143,7 +156,7 @@ export default function ProfilePage() {
                             <div>
                                 <label
                                     htmlFor="username"
-                                    className="block text-sm font-medium text-gray-700 mb-1"
+                                    className="block text-sm font-medium text-gray-800 mb-1"
                                 >
                                     Username *
                                 </label>
@@ -152,7 +165,7 @@ export default function ProfilePage() {
                                     id="username"
                                     name="username"
                                     required
-                                    className="w-full p-2 border border-gray-300 rounded-md bg-gray-100"
+                                    className="w-full p-2 border border-gray-300 rounded-md bg-gray-100 text-gray-600"
                                     value={profile.username}
                                     disabled
                                 />
@@ -161,7 +174,7 @@ export default function ProfilePage() {
                             <div>
                                 <label
                                     htmlFor="email"
-                                    className="block text-sm font-medium text-gray-700 mb-1"
+                                    className="block text-sm font-medium text-gray-800 mb-1"
                                 >
                                     Email *
                                 </label>
@@ -170,7 +183,7 @@ export default function ProfilePage() {
                                     id="email"
                                     name="email"
                                     required
-                                    className="w-full p-2 border border-gray-300 rounded-md bg-gray-100"
+                                    className="w-full p-2 border border-gray-300 rounded-md bg-gray-100 text-gray-600"
                                     value={profile.email}
                                     disabled
                                 />
@@ -179,7 +192,7 @@ export default function ProfilePage() {
                             <div>
                                 <label
                                     htmlFor="first_name"
-                                    className="block text-sm font-medium text-gray-700 mb-1"
+                                    className="block text-sm font-medium text-gray-800 mb-1"
                                 >
                                     First Name *
                                 </label>
@@ -188,7 +201,7 @@ export default function ProfilePage() {
                                     id="first_name"
                                     name="first_name"
                                     required
-                                    className="w-full p-2 border border-gray-300 rounded-md"
+                                    className="w-full p-2 border border-gray-300 rounded-md text-gray-600"
                                     value={profile.first_name}
                                     onChange={handleChange}
                                 />
@@ -197,7 +210,7 @@ export default function ProfilePage() {
                             <div>
                                 <label
                                     htmlFor="last_name"
-                                    className="block text-sm font-medium text-gray-700 mb-1"
+                                    className="block text-sm font-medium text-gray-800 mb-1"
                                 >
                                     Last Name *
                                 </label>
@@ -206,7 +219,7 @@ export default function ProfilePage() {
                                     id="last_name"
                                     name="last_name"
                                     required
-                                    className="w-full p-2 border border-gray-300 rounded-md"
+                                    className="w-full p-2 border border-gray-300 rounded-md text-gray-600"
                                     value={profile.last_name}
                                     onChange={handleChange}
                                 />
@@ -215,7 +228,7 @@ export default function ProfilePage() {
                             <div>
                                 <label
                                     htmlFor="phone_number"
-                                    className="block text-sm font-medium text-gray-700 mb-1"
+                                    className="block text-sm font-medium text-gray-800 mb-1"
                                 >
                                     Phone Number
                                 </label>
@@ -223,7 +236,7 @@ export default function ProfilePage() {
                                     type="number"
                                     id="phone_number"
                                     name="phone_number"
-                                    className="w-full p-2 border border-gray-300 rounded-md"
+                                    className="w-full p-2 border border-gray-300 rounded-md text-gray-600"
                                     value={profile.phone_number}
                                     onChange={handleChange}
                                 />
@@ -232,7 +245,7 @@ export default function ProfilePage() {
                             <div>
                                 <label
                                     htmlFor="address"
-                                    className="block text-sm font-medium text-gray-700 mb-1"
+                                    className="block text-sm font-medium text-gray-800 mb-1"
                                 >
                                     Address
                                 </label>
@@ -240,7 +253,7 @@ export default function ProfilePage() {
                                     type="text"
                                     id="address"
                                     name="address"
-                                    className="w-full p-2 border border-gray-300 rounded-md"
+                                    className="w-full p-2 border border-gray-300 rounded-md text-gray-600"
                                     value={profile.address}
                                     onChange={handleChange}
                                 />
@@ -249,7 +262,7 @@ export default function ProfilePage() {
                         <div>
                             <label
                                 htmlFor="role"
-                                className="block text-sm font-medium text-gray-700 mb-1"
+                                className="block text-sm font-medium text-gray-800 mb-1"
                             >
                                 Role
                             </label>
@@ -258,7 +271,7 @@ export default function ProfilePage() {
                                 id="role"
                                 name="role"
                                 required
-                                className="w-full p-2 border border-gray-300 rounded-md bg-gray-100"
+                                className="w-full p-2 border border-gray-300 rounded-md bg-gray-100 text-gray-600"
                                 value={profile.role}
                                 disabled
                             />

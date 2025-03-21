@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/providers/auth-provider";
-import { restaurantApi } from "@/lib/api";
 
 export default function AddRestaurantPage() {
     const router = useRouter();
@@ -138,7 +137,7 @@ export default function AddRestaurantPage() {
                                 id="name"
                                 name="name"
                                 required
-                                className="w-full p-2 border border-gray-300 rounded-md"
+                                className="w-full p-2 border border-gray-300 rounded-md text-gray-600"
                                 value={formData.name}
                                 onChange={handleChange}
                             />
@@ -156,7 +155,7 @@ export default function AddRestaurantPage() {
                                 id="address"
                                 name="address"
                                 required
-                                className="w-full p-2 border border-gray-300 rounded-md"
+                                className="w-full p-2 border border-gray-300 rounded-md text-gray-600"
                                 value={formData.address}
                                 onChange={handleChange}
                             />
@@ -174,7 +173,7 @@ export default function AddRestaurantPage() {
                                 name="description"
                                 required
                                 rows={4}
-                                className="w-full p-2 border border-gray-300 rounded-md"
+                                className="w-full p-2 border border-gray-300 rounded-md text-gray-600"
                                 value={formData.description}
                                 onChange={handleChange}
                             />
@@ -192,7 +191,7 @@ export default function AddRestaurantPage() {
                                 id="phone_number"
                                 name="phone_number"
                                 required
-                                className="w-full p-2 border border-gray-300 rounded-md"
+                                className="w-full p-2 border border-gray-300 rounded-md text-gray-600"
                                 value={formData.phone_number}
                                 onChange={handleChange}
                             />
@@ -210,7 +209,7 @@ export default function AddRestaurantPage() {
                                 id="image"
                                 name="image"
                                 accept="image/*"
-                                className="w-full p-2 border border-gray-300 rounded-md"
+                                className="w-full p-2 border border-gray-300 rounded-md text-gray-600"
                                 onChange={handleImageChange}
                             />
                             {image && (

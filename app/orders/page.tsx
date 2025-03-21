@@ -9,13 +9,18 @@ import Link from "next/link";
 
 export default function OrdersPage() {
     const router = useRouter();
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, isRestaurantOwner } = useAuth();
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         if (!isAuthenticated) {
             router.push("/login?redirect=/orders");
+            return;
+        }
+
+        if (isRestaurantOwner) {
+            router.push("/dashboard");
             return;
         }
 
@@ -35,8 +40,8 @@ export default function OrdersPage() {
 
     if (loading) {
         return (
-            <div className="flex justify-center items-center h-64">
-                Loading orders...
+            <div className="flex justify-center items-center h-64 text-gray-600">
+                Loading...
             </div>
         );
     }

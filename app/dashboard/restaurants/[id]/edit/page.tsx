@@ -120,7 +120,7 @@ export default function EditRestaurantPage() {
 
     if (loading) {
         return (
-            <div className="flex justify-center items-center h-64">
+            <div className="flex justify-center items-center h-64 text-gray-600">
                 Loading restaurant data...
             </div>
         );
@@ -168,10 +168,11 @@ export default function EditRestaurantPage() {
                             </p>
                             <div className="relative h-48 w-full max-w-md">
                                 <Image
-                                    src={`http://localhost:8000${restaurant.image}`}
+                                    src={restaurant.image}
                                     alt={restaurant.name}
                                     fill
                                     className="object-cover rounded-md"
+                                    unoptimized={true}
                                 />
                             </div>
                         </div>

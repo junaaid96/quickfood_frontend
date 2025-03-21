@@ -22,7 +22,7 @@ export default function Navbar() {
                         <nav className="ml-6 flex space-x-8">
                             <Link
                                 href="/restaurants"
-                                className="inline-flex items-center px-1 pt-1 text-gray-900"
+                                className="inline-flex items-center px-1 pt-1 text-gray-900 hover:text-orange-500"
                             >
                                 Restaurants
                             </Link>
@@ -30,7 +30,7 @@ export default function Navbar() {
                                 user?.role !== "restaurant_owner" && (
                                     <Link
                                         href="/orders"
-                                        className="inline-flex items-center px-1 pt-1 text-gray-500 hover:text-gray-900"
+                                        className="inline-flex items-center px-1 pt-1 text-gray-900 hover:text-orange-500"
                                     >
                                         My Orders
                                     </Link>
@@ -38,7 +38,7 @@ export default function Navbar() {
                             {user?.role === "restaurant_owner" && (
                                 <Link
                                     href="/dashboard"
-                                    className="inline-flex items-center px-1 pt-1 text-gray-500 hover:text-gray-900"
+                                    className="inline-flex items-center px-1 pt-1 text-gray-900 hover:text-orange-500"
                                 >
                                     Manage Restaurant
                                 </Link>
@@ -50,13 +50,13 @@ export default function Navbar() {
                             <>
                                 <Link
                                     href="/profile"
-                                    className="text-gray-500 hover:text-gray-900 mr-4"
+                                    className="text-gray-900 hover:text-orange-500 mr-4"
                                 >
                                     Profile
                                 </Link>
                                 <button
                                     onClick={logout}
-                                    className="text-gray-500 hover:text-gray-900"
+                                    className="text-gray-900 hover:text-orange-500"
                                 >
                                     Logout
                                 </button>
@@ -65,7 +65,7 @@ export default function Navbar() {
                             <>
                                 <Link
                                     href="/login"
-                                    className="text-gray-500 hover:text-gray-900 mr-4"
+                                    className="text-gray-900 hover:text-orange-500 mr-4"
                                 >
                                     Login
                                 </Link>
