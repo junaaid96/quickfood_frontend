@@ -1,7 +1,7 @@
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { getSession } from './auth';
 
-const API_URL = 'http://localhost:8000/api';
+const API_URL = 'https://quickfood-backend-hoi3.onrender.com/api';
 
 type RequestMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
