@@ -69,7 +69,7 @@ export default function AddMenuItemPage() {
             }
 
             const response = await fetch(
-                "http://localhost:8000/api/restaurants/menu-items/",
+                "https://quickfood-backend-hoi3.onrender.com/api/restaurants/menu-items/",
                 {
                     method: "POST",
                     headers: {

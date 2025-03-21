@@ -153,10 +153,11 @@ export default function RestaurantManagementPage() {
                                 <div className="relative h-32 w-32 flex-shrink-0">
                                     {item.image ? (
                                         <Image
-                                            src={`http://localhost:8000${item.image}`}
+                                            src={item.image}
                                             alt={item.name}
                                             fill
                                             className="object-cover"
+                                            unoptimized={true}
                                         />
                                     ) : (
                                         <div className="bg-gray-200 h-full w-full flex items-center justify-center">

@@ -63,7 +63,7 @@ export default function AddRestaurantPage() {
             }
 
             const response = await fetch(
-                "http://localhost:8000/api/restaurants/restaurant/",
+                "https://quickfood-backend-hoi3.onrender.com/api/restaurants/restaurant/",
                 {
                     method: "POST",
                     headers: {

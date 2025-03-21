@@ -156,10 +156,11 @@ export default function RestaurantDetailPage() {
                             <div className="relative h-24 w-24 flex-shrink-0">
                                 {item.image ? (
                                     <Image
-                                        src={`http://localhost:8000${item.image}`}
+                                        src={item.image}
                                         alt={item.name}
                                         fill
                                         className="object-cover rounded-md"
+                                        unoptimized={true}
                                     />
                                 ) : (
                                     <div className="bg-gray-200 h-full w-full flex items-center justify-center rounded-md">

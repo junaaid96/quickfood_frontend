@@ -93,7 +93,7 @@ export default function EditMenuItemPage() {
             }
 
             const response = await fetch(
-                `http://localhost:8000/api/restaurants/menu-items/${menuId}/`,
+                `https://quickfood-backend-hoi3.onrender.com/api/restaurants/menu-items/${menuId}/`,
                 {
                     method: "PATCH",
                     headers: {
@@ -172,10 +172,11 @@ export default function EditMenuItemPage() {
                             </p>
                             <div className="relative h-48 w-48">
                                 <Image
-                                    src={`http://localhost:8000${menuItem.image}`}
+                                    src={menuItem.image}
                                     alt={menuItem.name}
                                     fill
                                     className="object-cover rounded-md"
+                                    unoptimized={true}
                                 />
                             </div>
                         </div>

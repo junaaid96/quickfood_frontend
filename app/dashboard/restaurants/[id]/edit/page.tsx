@@ -89,7 +89,7 @@ export default function EditRestaurantPage() {
             }
 
             const response = await fetch(
-                `http://localhost:8000/api/restaurants/restaurant/${id}/`,
+                `https://quickfood-backend-hoi3.onrender.com/api/restaurants/restaurant/${id}/`,
                 {
                     method: "PATCH",
                     headers: {
