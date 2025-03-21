@@ -158,7 +158,7 @@ export default function OrderConfirmationPage() {
                             <input
                                 type="text"
                                 id="address"
-                                className="w-full p-2 border border-gray-300 rounded-md"
+                                className="w-full p-2 border border-gray-300 rounded-md text-gray-600"
                                 value={address}
                                 onChange={(e) => setAddress(e.target.value)}
                                 required
@@ -175,7 +175,7 @@ export default function OrderConfirmationPage() {
                             <input
                                 type="number"
                                 id="phone"
-                                className="w-full p-2 border border-gray-300 rounded-md"
+                                className="w-full p-2 border border-gray-300 rounded-md text-gray-600"
                                 value={phone}
                                 onChange={(e) => setPhone(e.target.value)}
                                 required
