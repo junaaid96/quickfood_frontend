@@ -1,228 +1,129 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/providers/auth-provider";
 import Link from "next/link";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { ForkKnife, Storefront } from "@phosphor-icons/react";
+import { useAuth, type RegisterInput } from "@/providers/auth-provider";
+import { ApiError } from "@/lib/api";
+import { cn } from "@/lib/format";
+import type { Role } from "@/lib/types";
+import { Button } from "@/components/ui/Button";
+import { Field, Input } from "@/components/ui/Field";
 
 export default function RegisterPage() {
-    const router = useRouter();
-    const { register, isLoading } = useAuth();
-    const [username, setUsername] = useState("");
-    const [email, setEmail] = useState("");
-    const [firstName, setFirstName] = useState("");
-    const [lastName, setLastName] = useState("");
-    const [password, setPassword] = useState("");
-    const [confirmPassword, setConfirmPassword] = useState("");
-    const [role, setRole] = useState("user");
+    return (
+        <Suspense>
+            <RegisterForm />
+        </Suspense>
+    );
+}
+
+function strength(pw: string) {
+    let score = 0;
+    if (pw.length >= 8) score++;
+    if (pw.length >= 12) score++;
+    if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
+    if (/\d/.test(pw) && /[^A-Za-z0-9]/.test(pw)) score++;
+    return score;
+}
+
+function RegisterForm() {
+    const { register, login } = useAuth();
+    const params = useSearchParams();
+    const [role, setRole] = useState<Role>(params.get("role") === "restaurant_owner" ? "restaurant_owner" : "user");
+    const [form, setForm] = useState({ first_name: "", last_name: "", username: "", email: "", phone_number: "", password: "" });
+    const [errors, setErrors] = useState<Record<string, string>>({});
     const [error, setError] = useState("");
+    const [loading, setLoading] = useState(false);
+    const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [k]: e.target.value });
+    const pw = strength(form.password);
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const submit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setErrors({});
         setError("");
-
-        if (password !== confirmPassword) {
-            setError("Passwords do not match");
-            return;
-        }
-
+        setLoading(true);
         try {
-            await register(
-                username,
-                email,
-                password,
-                role,
-                firstName,
-                lastName
-            );
-            router.push("/login");
-        } catch (err: any) {
-            setError(err.message || "Failed to register. Please try again.");
+            const payload: RegisterInput = { ...form, role };
+            await register(payload);
+            await login(form.username, form.password, role === "restaurant_owner" ? "/dashboard/restaurants/new" : params.get("redirect"));
+        } catch (err) {
+            if (err instanceof ApiError && Object.keys(err.fieldErrors).length) setErrors(err.fieldErrors);
+            else setError((err as Error).message);
+            setLoading(false);
         }
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-            <div className="max-w-md w-full space-y-8">
-                <div>
-                    <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-                        Create your account
-                    </h2>
-                </div>
+        <div className="animate-rise">
+            <h1 className="text-4xl font-extrabold">Create your account</h1>
+            <p className="mt-2 text-muted">It takes less than a minute.</p>
 
-                {error && (
-                    <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
-                        <div className="flex">
-                            <div className="flex-shrink-0">
-                                <svg
-                                    className="h-5 w-5 text-red-500"
-                                    viewBox="0 0 20 20"
-                                    fill="currentColor"
-                                >
-                                    <path
-                                        fillRule="evenodd"
-                                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                                        clipRule="evenodd"
-                                    />
-                                </svg>
-                            </div>
-                            <div className="ml-3">
-                                <p className="text-sm text-red-700">{error}</p>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-                    <div className="rounded-md shadow-sm -space-y-px">
-                        <div>
-                            <label htmlFor="username" className="sr-only">
-                                Username
-                            </label>
-                            <input
-                                id="username"
-                                name="username"
-                                type="text"
-                                autoComplete="username"
-                                required
-                                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm"
-                                placeholder="Username"
-                                value={username}
-                                onChange={(e) => setUsername(e.target.value)}
-                            />
-                        </div>
-                        <div className="flex">
-                            <div className="w-1/2 pr-1">
-                                <label htmlFor="firstName" className="sr-only">
-                                    First Name
-                                </label>
-                                <input
-                                    id="firstName"
-                                    name="firstName"
-                                    type="text"
-                                    required
-                                    className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm"
-                                    placeholder="First Name"
-                                    value={firstName}
-                                    onChange={(e) =>
-                                        setFirstName(e.target.value)
-                                    }
-                                />
-                            </div>
-                            <div className="w-1/2 pl-1">
-                                <label htmlFor="lastName" className="sr-only">
-                                    Last Name
-                                </label>
-                                <input
-                                    id="lastName"
-                                    name="lastName"
-                                    type="text"
-                                    required
-                                    className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm"
-                                    placeholder="Last Name"
-                                    value={lastName}
-                                    onChange={(e) =>
-                                        setLastName(e.target.value)
-                                    }
-                                />
-                            </div>
-                        </div>
-                        <div>
-                            <label htmlFor="email-address" className="sr-only">
-                                Email address
-                            </label>
-                            <input
-                                id="email-address"
-                                name="email"
-                                type="email"
-                                autoComplete="email"
-                                required
-                                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm"
-                                placeholder="Email address"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                            />
-                        </div>
-                        <div>
-                            <label htmlFor="password" className="sr-only">
-                                Password
-                            </label>
-                            <input
-                                id="password"
-                                name="password"
-                                type="password"
-                                autoComplete="new-password"
-                                required
-                                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm"
-                                placeholder="Password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                            />
-                        </div>
-                        <div>
-                            <label
-                                htmlFor="confirm-password"
-                                className="sr-only"
-                            >
-                                Confirm Password
-                            </label>
-                            <input
-                                id="confirm-password"
-                                name="confirm-password"
-                                type="password"
-                                autoComplete="new-password"
-                                required
-                                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm"
-                                placeholder="Confirm Password"
-                                value={confirmPassword}
-                                onChange={(e) =>
-                                    setConfirmPassword(e.target.value)
-                                }
-                            />
-                        </div>
-                        <div>
-                            <label htmlFor="role" className="sr-only">
-                                Role
-                            </label>
-                            <select
-                                id="role"
-                                name="role"
-                                required
-                                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm"
-                                value={role}
-                                onChange={(e) => setRole(e.target.value)}
-                            >
-                                <option value="user">Customer</option>
-                                <option value="restaurant_owner">
-                                    Restaurant Owner
-                                </option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div>
-                        <button
-                            type="submit"
-                            disabled={isLoading}
-                            className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-orange-500 hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50"
-                        >
-                            {isLoading ? "Loading..." : "Sign up"}
-                        </button>
-                    </div>
-
-                    <div className="text-center">
-                        <p className="text-sm text-gray-600">
-                            Already have an account?{" "}
-                            <Link
-                                href="/login"
-                                className="font-medium text-orange-500 hover:text-orange-400"
-                            >
-                                Sign in
-                            </Link>
-                        </p>
-                    </div>
-                </form>
+            <div className="mt-8 grid grid-cols-2 gap-3" role="radiogroup" aria-label="Account type">
+                {[
+                    { value: "user" as Role, label: "I want to order", icon: ForkKnife },
+                    { value: "restaurant_owner" as Role, label: "I run a restaurant", icon: Storefront },
+                ].map(({ value, label, icon: Icon }) => (
+                    <button
+                        key={value}
+                        type="button"
+                        role="radio"
+                        aria-checked={role === value}
+                        onClick={() => setRole(value)}
+                        className={cn(
+                            "flex flex-col items-start gap-3 rounded-2xl border-2 p-4 text-left transition",
+                            role === value ? "border-brand bg-brand-soft" : "border-line bg-surface hover:border-ink/30",
+                        )}
+                    >
+                        <Icon size={26} weight={role === value ? "fill" : "regular"} className={role === value ? "text-brand" : "text-muted"} />
+                        <span className="font-semibold">{label}</span>
+                    </button>
+                ))}
             </div>
+
+            <form className="mt-6 space-y-4" onSubmit={submit}>
+                <div className="grid grid-cols-2 gap-3">
+                    <Field label="First name" error={errors.first_name}>
+                        <Input required autoComplete="given-name" value={form.first_name} onChange={set("first_name")} />
+                    </Field>
+                    <Field label="Last name" error={errors.last_name}>
+                        <Input required autoComplete="family-name" value={form.last_name} onChange={set("last_name")} />
+                    </Field>
+                </div>
+                <Field label="Username" error={errors.username}>
+                    <Input required autoComplete="username" value={form.username} onChange={set("username")} />
+                </Field>
+                <Field label="Email" error={errors.email}>
+                    <Input required type="email" autoComplete="email" value={form.email} onChange={set("email")} />
+                </Field>
+                <Field label="Phone (optional)" error={errors.phone_number} hint="So the rider or kitchen can reach you.">
+                    <Input type="tel" autoComplete="tel" value={form.phone_number} onChange={set("phone_number")} maxLength={15} />
+                </Field>
+                <Field label="Password" error={errors.password}>
+                    <Input required type="password" autoComplete="new-password" value={form.password} onChange={set("password")} />
+                    {form.password && (
+                        <span className="mt-2 flex items-center gap-2">
+                            <span className="flex flex-1 gap-1">
+                                {[0, 1, 2, 3].map((i) => (
+                                    <span key={i} className={cn("h-1.5 flex-1 rounded-full", i < pw ? (pw >= 3 ? "bg-ok" : pw === 2 ? "bg-warn" : "bg-danger") : "bg-line")} />
+                                ))}
+                            </span>
+                            <span className="text-xs text-muted">{["Too short", "Weak", "Okay", "Strong", "Great"][pw]}</span>
+                        </span>
+                    )}
+                </Field>
+                {error && <p role="alert" className="rounded-xl bg-danger-soft px-4 py-3 text-sm text-danger">{error}</p>}
+                <Button type="submit" size="lg" loading={loading} className="w-full">
+                    {role === "restaurant_owner" ? "Create partner account" : "Create account"}
+                </Button>
+            </form>
+            <p className="mt-8 text-center text-muted">
+                Already have an account?{" "}
+                <Link href="/login" className="font-semibold text-brand hover:underline">
+                    Log in
+                </Link>
+            </p>
         </div>
     );
 }

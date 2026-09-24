@@ -1,306 +1,333 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { ordersApi } from "@/lib/api";
-import { Order } from "@/lib/types";
+import Link from "next/link";
+import { Suspense, useEffect, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
+import {
+    ArrowClockwise,
+    ArrowLeft,
+    CalendarCheck,
+    ChatCircleDots,
+    Confetti,
+    Leaf,
+    MapPin,
+    Phone,
+    Receipt,
+    Star,
+} from "@phosphor-icons/react";
+import { useApi } from "@/lib/hooks";
+import { request } from "@/lib/api";
+import { STATUS_COPY, isActive, orderProgress } from "@/lib/orders";
+import { clock, cn, dateTime, money, num } from "@/lib/format";
+import type { Order } from "@/lib/types";
+import { useReorder } from "@/lib/useReorder";
 import { useAuth } from "@/providers/auth-provider";
+import { useToast } from "@/providers/toast-provider";
+import { Button, LinkButton } from "@/components/ui/Button";
+import { Card, EmptyState, Skeleton, StarInput } from "@/components/ui/Bits";
+import { Textarea } from "@/components/ui/Field";
+import { CoverImage } from "@/components/ui/CoverImage";
+import { Modal } from "@/components/ui/Overlay";
+import { StatusTimeline } from "@/components/orders/StatusTimeline";
+import { RouteMap } from "@/components/orders/RouteMap";
+import { OrderChat } from "@/components/orders/OrderChat";
+import { SplitBill } from "@/components/orders/SplitBill";
 
-export default function OrderTrackingPage() {
-    const { id } = useParams();
-    const router = useRouter();
+export default function OrderPage() {
+    return (
+        <Suspense>
+            <OrderDetail />
+        </Suspense>
+    );
+}
+
+function OrderDetail() {
+    const { id } = useParams<{ id: string }>();
+    const placed = useSearchParams().get("placed") === "1";
     const { user, isRestaurantOwner } = useAuth();
-    const [order, setOrder] = useState<Order | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [updating, setUpdating] = useState(false);
+    const toast = useToast();
+    const { reorder, busy } = useReorder();
+    const [now, setNow] = useState(() => Date.now());
+    const [cancelOpen, setCancelOpen] = useState(false);
+    const [cancelling, setCancelling] = useState(false);
+
+    const { data: order, error, mutate } = useApi<Order>(user ? `/orders/${id}/` : null, {
+        refreshInterval: (o) => (o && isActive(o.status) ? 8000 : 0),
+    });
 
     useEffect(() => {
-        async function fetchOrder() {
-            try {
-                const orderData = await ordersApi.getById(id as string);
-                setOrder(orderData);
-            } catch (error) {
-                console.error("Error fetching order:", error);
-            } finally {
-                setLoading(false);
-            }
-        }
+        const t = setInterval(() => setNow(Date.now()), 15000);
+        return () => clearInterval(t);
+    }, []);
 
-        fetchOrder();
-    }, [id]);
-
-    const updateOrderStatus = async (status: string) => {
-        if (!order) return;
-
-        setUpdating(true);
-        try {
-            const updatedOrder = await ordersApi.updateStatus(
-                id as string,
-                status
-            );
-            setOrder(updatedOrder);
-        } catch (error) {
-            console.error("Error updating order status:", error);
-            alert("Failed to update order status. Please try again.");
-        } finally {
-            setUpdating(false);
-        }
-    };
-
-    const getStatusStep = (status: string) => {
-        switch (status) {
-            case "pending":
-                return 1;
-            case "preparing":
-                return 2;
-            case "out_for_delivery":
-                return 3;
-            case "delivered":
-                return 4;
-            default:
-                return 1;
-        }
-    };
-
-    if (loading) {
+    if (error) {
         return (
-            <div className="flex justify-center items-center h-64 text-gray-600">
-                Loading order details...
+            <div className="mx-auto max-w-lg px-4 py-16">
+                <EmptyState icon={<Receipt size={26} />} title="Order not found" body="It may belong to a different account." action={<LinkButton href="/orders">My orders</LinkButton>} />
             </div>
         );
     }
+    if (!order) return <OrderSkeleton />;
 
-    if (!order) {
-        return <div className="text-center py-10">Order not found</div>;
-    }
+    const active = isActive(order.status);
+    const copy = STATUS_COPY[order.status];
+    const progress = orderProgress(order, now);
+    const eta = order.estimated_delivery_at ? new Date(order.estimated_delivery_at).getTime() : null;
+    const minsLeft = eta ? Math.round((eta - now) / 60000) : null;
+    const chatOpen = active || (order.delivered_at ? now - new Date(order.delivered_at).getTime() < 2 * 3600 * 1000 : false);
+    const r = order.restaurant_details;
 
-    const statusStep = getStatusStep(order.status);
+    const cancel = async () => {
+        setCancelling(true);
+        try {
+            const updated = await request<Order>(`/orders/${order.id}/cancel/`, { method: "POST", body: { reason: "Cancelled by customer" } });
+            mutate(updated, { revalidate: false });
+            toast("Order cancelled");
+            setCancelOpen(false);
+        } catch (e) {
+            toast((e as Error).message, "error");
+        } finally {
+            setCancelling(false);
+        }
+    };
 
     return (
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-bold text-gray-900">
-                    Order #{order.id}
-                </h1>
-                <span className="text-sm text-gray-500">
-                    {new Date(order.created_at || "").toLocaleString()}
-                </span>
-            </div>
+        <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
+            <Link href={isRestaurantOwner ? "/dashboard/orders" : "/orders"} className="inline-flex items-center gap-1.5 text-sm font-medium text-muted hover:text-ink">
+                <ArrowLeft size={16} /> {isRestaurantOwner ? "Kitchen board" : "All orders"}
+            </Link>
 
-            <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
-                <div className="p-6">
-                    <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-xl font-semibold text-gray-900">
-                            Order Status
-                        </h2>
-                        <span
-                            className={`px-3 py-1 rounded-full text-sm font-medium ${
-                                order.status === "delivered"
-                                    ? "bg-green-100 text-green-800"
-                                    : order.status === "out_for_delivery"
-                                    ? "bg-blue-100 text-blue-800"
-                                    : order.status === "preparing"
-                                    ? "bg-yellow-100 text-yellow-800"
-                                    : "bg-gray-100 text-gray-800"
-                            }`}
-                        >
-                            {order.status
-                                .replace("_", " ")
-                                .charAt(0)
-                                .toUpperCase() +
-                                order.status.replace("_", " ").slice(1)}
-                        </span>
+            {placed && active && (
+                <div className="mt-4 flex animate-rise items-center gap-3 rounded-2xl bg-ok-soft p-4 text-ok">
+                    <Confetti size={26} weight="duotone" />
+                    <p className="font-semibold">Order placed! We&apos;ll keep this page updated, no need to refresh.</p>
+                </div>
+            )}
+
+            <div className="mt-4 grid items-start gap-6 lg:grid-cols-[1.3fr_1fr]">
+                <div className="space-y-6">
+                    {/* Status hero */}
+                    <Card className="overflow-hidden p-0 sm:p-0">
+                        <div className="p-5 sm:p-6">
+                            <div className="flex flex-wrap items-start justify-between gap-4">
+                                <div>
+                                    <p className="text-sm text-muted">
+                                        Order #{order.id} · {dateTime(order.created_at)}
+                                    </p>
+                                    <h1 className="mt-1 text-3xl font-extrabold">{copy.title}</h1>
+                                    <p className="mt-1 text-muted">{copy.body}</p>
+                                </div>
+                                {active && eta && (
+                                    <div className="rounded-2xl bg-brand-soft px-4 py-3 text-right">
+                                        <p className="text-xs font-semibold text-brand">{order.scheduled_for ? "Scheduled for" : "Arriving"}</p>
+                                        <p className="tabular font-display text-2xl font-extrabold text-brand">
+                                            {order.scheduled_for ? clock(order.scheduled_for) : minsLeft !== null && minsLeft > 1 ? `${minsLeft} min` : "Any minute"}
+                                        </p>
+                                        {!order.scheduled_for && <p className="tabular text-xs text-muted">by {clock(eta)}</p>}
+                                    </div>
+                                )}
+                                {order.status === "delivered" && order.delivered_at && (
+                                    <p className="rounded-2xl bg-ok-soft px-4 py-3 text-sm font-semibold text-ok">Delivered at {clock(order.delivered_at)}</p>
+                                )}
+                            </div>
+                            {order.scheduled_for && active && (
+                                <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-surface-2 px-3 py-1 text-sm">
+                                    <CalendarCheck size={16} /> Scheduled delivery, {dateTime(order.scheduled_for)}
+                                </p>
+                            )}
+                            {active && (
+                                <div className="mt-5 h-2 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-valuenow={Math.round(progress * 100)} aria-valuemin={0} aria-valuemax={100}>
+                                    <div className="h-full rounded-full bg-brand transition-all duration-1000" style={{ width: `${Math.max(4, progress * 100)}%` }} />
+                                </div>
+                            )}
+                        </div>
+                        {order.status !== "cancelled" && (
+                            <div className="border-t border-line p-3 sm:p-4">
+                                <RouteMap progress={progress} active={active} />
+                            </div>
+                        )}
+                    </Card>
+
+                    <div className="grid gap-6 md:grid-cols-2">
+                        <Card>
+                            <h2 className="mb-4 font-bold">Timeline</h2>
+                            <StatusTimeline order={order} />
+                            {order.can_cancel && (
+                                <Button variant="danger" size="sm" className="mt-5 w-full" onClick={() => setCancelOpen(true)}>
+                                    Cancel order
+                                </Button>
+                            )}
+                        </Card>
+                        <Card>
+                            <h2 className="mb-3 flex items-center gap-2 font-bold">
+                                <ChatCircleDots size={20} className="text-brand" /> {isRestaurantOwner ? "Chat with customer" : `Chat with ${r.name}`}
+                            </h2>
+                            <OrderChat orderId={order.id} open={chatOpen} asRestaurant={isRestaurantOwner} counterpart={isRestaurantOwner ? "the customer" : r.name} />
+                        </Card>
                     </div>
 
-                    <div className="relative pt-8">
-                        <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-gray-200">
-                            <div
-                                className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-orange-500"
-                                style={{ width: `${(statusStep / 4) * 100}%` }}
-                            ></div>
-                        </div>
-                        <div className="flex justify-between">
-                            <div className="text-center">
-                                <div
-                                    className={`w-8 h-8 mx-auto rounded-full flex items-center justify-center ${
-                                        statusStep >= 1
-                                            ? "bg-orange-500 text-white"
-                                            : "bg-gray-500"
-                                    }`}
-                                >
-                                    1
-                                </div>
-                                <div className="text-xs mt-1 text-gray-600">
-                                    Pending
-                                </div>
-                            </div>
-                            <div className="text-center">
-                                <div
-                                    className={`w-8 h-8 mx-auto rounded-full flex items-center justify-center ${
-                                        statusStep >= 2
-                                            ? "bg-orange-500 text-white"
-                                            : "bg-gray-500"
-                                    }`}
-                                >
-                                    2
-                                </div>
-                                <div className="text-xs mt-1 text-gray-600">
-                                    Preparing
-                                </div>
-                            </div>
-                            <div className="text-center">
-                                <div
-                                    className={`w-8 h-8 mx-auto rounded-full flex items-center justify-center ${
-                                        statusStep >= 3
-                                            ? "bg-orange-500 text-white"
-                                            : "bg-gray-500"
-                                    }`}
-                                >
-                                    3
-                                </div>
-                                <div className="text-xs mt-1 text-gray-600">
-                                    Out for Delivery
-                                </div>
-                            </div>
-                            <div className="text-center">
-                                <div
-                                    className={`w-8 h-8 mx-auto rounded-full flex items-center justify-center ${
-                                        statusStep >= 4
-                                            ? "bg-orange-500 text-white"
-                                            : "bg-gray-500"
-                                    }`}
-                                >
-                                    4
-                                </div>
-                                <div className="text-xs mt-1 text-gray-600">
-                                    Delivered
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    {order.status === "delivered" && !isRestaurantOwner && <ReviewCard order={order} onDone={() => mutate()} />}
+                </div>
 
-                    {isRestaurantOwner && order.status !== "delivered" && (
-                        <div className="mt-6 border-t border-gray-200 pt-4">
-                            <h3 className="text-lg font-medium text-gray-900 mb-2">
-                                Update Order Status
-                            </h3>
-                            <div className="flex space-x-2">
-                                {order.status === "pending" && (
-                                    <button
-                                        onClick={() =>
-                                            updateOrderStatus("preparing")
-                                        }
-                                        disabled={updating}
-                                        className="px-4 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 disabled:opacity-50"
-                                    >
-                                        Start Preparing
-                                    </button>
-                                )}
-                                {order.status === "preparing" && (
-                                    <button
-                                        onClick={() =>
-                                            updateOrderStatus(
-                                                "out_for_delivery"
-                                            )
-                                        }
-                                        disabled={updating}
-                                        className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50"
-                                    >
-                                        Out for Delivery
-                                    </button>
-                                )}
-                                {order.status === "out_for_delivery" && (
-                                    <button
-                                        onClick={() =>
-                                            updateOrderStatus("delivered")
-                                        }
-                                        disabled={updating}
-                                        className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 disabled:opacity-50"
-                                    >
-                                        Mark as Delivered
-                                    </button>
-                                )}
+                {/* Receipt */}
+                <div className="space-y-6 lg:sticky lg:top-24">
+                    <Card>
+                        <Link href={`/restaurants/${r.id}`} className="flex items-center gap-3">
+                            <CoverImage src={r.cover_image} alt="" cuisine={r.cuisine} iconSize={20} className="size-12 rounded-xl" />
+                            <div className="min-w-0 flex-1">
+                                <p className="truncate font-bold hover:text-brand">{r.name}</p>
+                                <p className="truncate text-sm text-muted">{r.address}</p>
                             </div>
+                            <a href={`tel:${r.phone_number}`} onClick={(e) => e.stopPropagation()} aria-label="Call restaurant" className="grid size-10 place-items-center rounded-full bg-surface-2 hover:text-brand">
+                                <Phone size={18} />
+                            </a>
+                        </Link>
+                        <ul className="mt-5 space-y-2 border-t border-line pt-4 text-sm">
+                            {order.items.map((i) => (
+                                <li key={i.id} className="flex justify-between gap-3">
+                                    <span>
+                                        <span className="tabular font-semibold">{i.quantity}x</span> {i.menu_item_details.name}
+                                        {i.note && <span className="block text-xs text-muted">{i.note}</span>}
+                                    </span>
+                                    <span className="tabular">{money(num(i.price) * i.quantity)}</span>
+                                </li>
+                            ))}
+                        </ul>
+                        <dl className="mt-4 space-y-1.5 border-t border-line pt-4 text-sm">
+                            <Row label="Subtotal" value={money(order.subtotal)} />
+                            <Row label={`Delivery · ${order.delivery_option_label}`} value={num(order.delivery_fee) ? money(order.delivery_fee) : "Free"} />
+                            <Row label="Service fee" value={money(order.service_fee)} />
+                            {num(order.discount) > 0 && <Row label={`Promo ${order.promo_code ?? ""}`} value={`-${money(order.discount)}`} good />}
+                            {num(order.points_discount) > 0 && <Row label={`${order.points_redeemed} points`} value={`-${money(order.points_discount)}`} good />}
+                            {num(order.tip) > 0 && <Row label="Rider tip" value={money(order.tip)} />}
+                            <div className="flex justify-between border-t border-line pt-3 text-base font-bold">
+                                <dt>Total · {order.payment_method === "cash" ? "Cash" : "Card"}</dt>
+                                <dd className="tabular">{money(order.total_price)}</dd>
+                            </div>
+                        </dl>
+                        {order.delivery_option === "eco" && (
+                            <p className="mt-4 flex items-center gap-2 rounded-2xl bg-ok-soft px-3 py-2 text-sm text-ok">
+                                <Leaf size={16} weight="fill" /> Wait & Save: shared ride, fewer trips.
+                            </p>
+                        )}
+                        {order.points_earned > 0 && (
+                            <p className="mt-3 flex items-center gap-2 rounded-2xl bg-warn-soft px-3 py-2 text-sm text-warn">
+                                <Star size={16} weight="fill" /> You earned {order.points_earned} points
+                            </p>
+                        )}
+                        <div className="mt-4 flex items-start gap-2 text-sm text-muted">
+                            <MapPin size={16} className="mt-0.5 shrink-0" />
+                            <span>
+                                {order.delivery_address}
+                                {order.notes && <span className="block text-xs">{order.notes}</span>}
+                            </span>
                         </div>
+                        {isRestaurantOwner && (
+                            <p className="mt-2 text-sm text-muted">
+                                Customer: {order.user_details.first_name || order.user_details.username} {order.contact_phone && `· ${order.contact_phone}`}
+                            </p>
+                        )}
+                        {!active && !isRestaurantOwner && (
+                            <Button variant="outline" className="mt-5 w-full" loading={busy === order.id} onClick={() => reorder(order.id)} icon={<ArrowClockwise size={18} />}>
+                                Order this again
+                            </Button>
+                        )}
+                    </Card>
+                    {!isRestaurantOwner && order.status !== "cancelled" && (
+                        <Card>
+                            <SplitBill order={order} />
+                        </Card>
                     )}
                 </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
-                <div className="p-6">
-                    <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                        Order Details
-                    </h2>
-
-                    <div className="mb-4">
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">
-                            Restaurant
-                        </h3>
-                        <p className="text-gray-600">{order.restaurant}</p>
-                    </div>
-
-                    <div className="mb-4">
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">
-                            Delivery Address
-                        </h3>
-                        <p className="text-gray-600">
-                            {order.delivery_address}
-                        </p>
-                    </div>
-
-                    <div className="mb-4">
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">
-                            Contact
-                        </h3>
-                        <p className="text-gray-600">
-                            {order.user_details?.phone_number ||
-                                "No phone number provided"}
-                        </p>
-                    </div>
-
-                    <div>
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">
-                            Items
-                        </h3>
-                        <div className="border-t border-gray-300">
-                            {order.items?.map((item, index) => (
-                                <div
-                                    key={index}
-                                    className="py-3 flex justify-between border-b border-gray-200"
-                                >
-                                    <div>
-                                        <span className="font-medium text-gray-600">
-                                            {item.quantity}x{" "}
-                                        </span>
-                                        <span className="text-gray-600">
-                                            {item.menu_item_details?.name}
-                                        </span>
-                                    </div>
-                                    <span className="text-gray-600">
-                                        $
-                                        {(
-                                            Number(item.price) * item.quantity
-                                        ).toFixed(2)}
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
-                        <div className="py-3 flex justify-between font-bold text-gray-800">
-                            <span>Total</span>
-                            <span>${order.total_price}</span>
-                        </div>
-                    </div>
+            <Modal open={cancelOpen} onClose={() => setCancelOpen(false)} title="Cancel this order?">
+                <p className="text-muted">The kitchen hasn&apos;t started yet, so there&apos;s no charge. Any points you used go straight back to your balance.</p>
+                <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                    <Button variant="outline" onClick={() => setCancelOpen(false)}>
+                        Keep my order
+                    </Button>
+                    <Button variant="danger" loading={cancelling} onClick={cancel}>
+                        Yes, cancel
+                    </Button>
                 </div>
-            </div>
+            </Modal>
+        </div>
+    );
+}
 
-            <div className="flex justify-end">
-                <button
-                    onClick={() => router.push("/orders")}
-                    className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-                >
-                    Back to Orders
-                </button>
+function Row({ label, value, good }: { label: string; value: string; good?: boolean }) {
+    return (
+        <div className="flex justify-between gap-3">
+            <dt className="text-muted">{label}</dt>
+            <dd className={cn("tabular", good && "font-semibold text-ok")}>{value}</dd>
+        </div>
+    );
+}
+
+function ReviewCard({ order, onDone }: { order: Order; onDone: () => void }) {
+    const toast = useToast();
+    const [rating, setRating] = useState(0);
+    const [comment, setComment] = useState("");
+    const [saving, setSaving] = useState(false);
+
+    if (order.review) {
+        return (
+            <Card>
+                <h2 className="font-bold">Your review</h2>
+                <div className="mt-2 flex">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                        <Star key={n} size={20} weight={n <= order.review!.rating ? "fill" : "regular"} className="text-warn" />
+                    ))}
+                </div>
+                {order.review.comment && <p className="mt-2">{order.review.comment}</p>}
+                {order.review.owner_reply && (
+                    <p className="mt-3 rounded-2xl bg-surface-2 p-3 text-sm">
+                        <span className="font-semibold">{order.restaurant_details.name} replied: </span>
+                        {order.review.owner_reply}
+                    </p>
+                )}
+            </Card>
+        );
+    }
+
+    const submit = async () => {
+        setSaving(true);
+        try {
+            await request("/restaurants/reviews/", { method: "POST", body: { order: order.id, rating, comment } });
+            toast("Thanks! Your review helps other hungry people.");
+            onDone();
+        } catch (e) {
+            toast((e as Error).message, "error");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <Card className="border-brand/30">
+            <h2 className="text-lg font-bold">How was it?</h2>
+            <p className="text-sm text-muted">Your review is marked as a verified order.</p>
+            <div className="mt-4">
+                <StarInput value={rating} onChange={setRating} />
             </div>
+            {rating > 0 && (
+                <div className="mt-4 animate-rise space-y-3">
+                    <Textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder={rating >= 4 ? "What did you love?" : "What could be better?"} maxLength={1000} />
+                    <Button onClick={submit} loading={saving}>
+                        Post review
+                    </Button>
+                </div>
+            )}
+        </Card>
+    );
+}
+
+function OrderSkeleton() {
+    return (
+        <div className="mx-auto grid max-w-6xl gap-6 px-4 py-10 sm:px-6 lg:grid-cols-[1.3fr_1fr]">
+            <Skeleton className="h-[520px] rounded-3xl" />
+            <Skeleton className="h-[420px] rounded-3xl" />
         </div>
     );
 }
