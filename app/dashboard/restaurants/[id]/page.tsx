@@ -1,205 +1,231 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { useAuth } from "@/providers/auth-provider";
-import { restaurantApi, menuItemsApi } from "@/lib/api";
-import { Restaurant, MenuItem } from "@/lib/types";
-import Image from "next/image";
 import Link from "next/link";
+import { Suspense, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { ArrowLeft, ArrowSquareOut, PencilSimple, Plus, Trash } from "@phosphor-icons/react";
+import { request } from "@/lib/api";
+import { useApi } from "@/lib/hooks";
+import { cn, money } from "@/lib/format";
+import type { MenuItem, RestaurantDetail, Review } from "@/lib/types";
+import { useToast } from "@/providers/toast-provider";
+import { Badge, EmptyState, Segmented, Skeleton } from "@/components/ui/Bits";
+import { Button, LinkButton } from "@/components/ui/Button";
+import { CoverImage } from "@/components/ui/CoverImage";
+import { Modal } from "@/components/ui/Overlay";
+import { DietaryTags } from "@/components/restaurant/Dietary";
+import { MenuItemForm } from "@/components/dashboard/MenuItemForm";
+import { RestaurantForm } from "@/components/dashboard/RestaurantForm";
+import { ReviewReplyList } from "@/components/dashboard/ReviewReplyList";
 
-export default function RestaurantManagementPage() {
-    const { id } = useParams();
+type Tab = "menu" | "details" | "reviews";
+
+export default function ManageRestaurantPage() {
+    return (
+        <Suspense>
+            <ManageRestaurant />
+        </Suspense>
+    );
+}
+
+function ManageRestaurant() {
+    const { id } = useParams<{ id: string }>();
+    const params = useSearchParams();
     const router = useRouter();
-    const { isAuthenticated, isRestaurantOwner } = useAuth();
-    const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
-    const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState("");
+    const toast = useToast();
+    const [tab, setTab] = useState<Tab>((params.get("tab") as Tab) || "menu");
+    const { data: r, mutate } = useApi<RestaurantDetail>(`/restaurants/restaurant/${id}/`);
+    const { data: reviews, mutate: mutateReviews } = useApi<Review[]>(`/restaurants/reviews/?restaurant=${id}`);
+    const [editing, setEditing] = useState<MenuItem | "new" | null>(null);
+    const [deleting, setDeleting] = useState<MenuItem | null>(null);
+    const [deleteRestaurant, setDeleteRestaurant] = useState(false);
 
-    useEffect(() => {
-        if (!isAuthenticated || !isRestaurantOwner) {
-            router.push("/login?redirect=/dashboard");
-            return;
-        }
-
-        async function fetchData() {
-            try {
-                const [restaurantData, menuData] = await Promise.all([
-                    restaurantApi.getById(id as string),
-                    menuItemsApi.getAll(id as string),
-                ]);
-
-                setRestaurant(restaurantData);
-                setMenuItems(menuData);
-            } catch (error) {
-                console.error("Error fetching restaurant data:", error);
-                setError("Failed to load restaurant data");
-            } finally {
-                setLoading(false);
-            }
-        }
-
-        fetchData();
-    }, [id, isAuthenticated, isRestaurantOwner, router]);
-
-    const handleDeleteMenuItem = async (menuItemId: number) => {
-        if (!confirm("Are you sure you want to delete this menu item?")) {
-            return;
-        }
-
-        try {
-            await menuItemsApi.delete(menuItemId.toString());
-            setMenuItems((prev) =>
-                prev.filter((item) => item.id !== menuItemId)
-            );
-        } catch (error) {
-            console.error("Error deleting menu item:", error);
-            alert("Failed to delete menu item");
-        }
-    };
-
-    if (loading) {
+    if (!r) {
         return (
-            <div className="flex justify-center items-center h-64 text-gray-600">
-                Loading restaurant data...
+            <div className="mx-auto max-w-6xl space-y-4 px-4 py-10 sm:px-6">
+                <Skeleton className="h-32 rounded-3xl" />
+                <Skeleton className="h-96 rounded-3xl" />
             </div>
         );
     }
 
-    if (error) {
-        return <div className="text-center py-10 text-red-500">{error}</div>;
-    }
+    const toggleAvailable = async (item: MenuItem) => {
+        mutate({ ...r, menu_items: r.menu_items.map((m) => (m.id === item.id ? { ...m, is_available: !m.is_available } : m)) }, { revalidate: false });
+        try {
+            await request(`/restaurants/menu-items/${item.id}/`, { method: "PATCH", body: { is_available: !item.is_available } });
+            toast(item.is_available ? `${item.name} marked sold out` : `${item.name} is back on`, "info");
+        } catch (e) {
+            toast((e as Error).message, "error");
+            mutate();
+        }
+    };
 
-    if (!restaurant) {
-        return <div className="text-center py-10">Restaurant not found</div>;
-    }
+    const removeItem = async () => {
+        if (!deleting) return;
+        try {
+            await request(`/restaurants/menu-items/${deleting.id}/`, { method: "DELETE" });
+            toast("Dish removed");
+            mutate();
+        } catch (e) {
+            toast((e as Error).message, "error");
+        } finally {
+            setDeleting(null);
+        }
+    };
+
+    const categories = r.categories;
+    const grouped = categories.map((c) => [c, r.menu_items.filter((i) => i.category === c)] as const);
 
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-bold text-gray-900">
-                    Manage Restaurant
-                </h1>
-                <div className="flex space-x-4">
-                    <Link href={`/dashboard/restaurants/${id}/edit`}>
-                        <button className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
-                            Edit Restaurant
-                        </button>
-                    </Link>
-                    <Link href={`/restaurants/${id}`} target="_blank">
-                        <button className="px-4 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600">
-                            View Restaurant
-                        </button>
-                    </Link>
+        <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+            <Link href="/dashboard/restaurants" className="inline-flex items-center gap-1.5 text-sm font-medium text-muted hover:text-ink">
+                <ArrowLeft size={16} /> Your restaurants
+            </Link>
+            <div className="mt-4 flex flex-col gap-5 sm:flex-row sm:items-center">
+                <CoverImage src={r.cover_image} alt={r.name} cuisine={r.cuisine} className="h-24 w-full shrink-0 rounded-2xl sm:w-40" />
+                <div className="flex-1">
+                    <h1 className="text-3xl font-extrabold">{r.name}</h1>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                        <Badge tone={r.is_open ? "ok" : "warn"}>{r.is_open ? "Open" : r.is_accepting_orders ? "Outside hours" : "Paused"}</Badge>
+                        <Badge>{r.menu_items.length} dishes</Badge>
+                        <Badge>{r.menu_items.filter((m) => !m.is_available).length} sold out</Badge>
+                    </div>
                 </div>
+                <LinkButton href={`/restaurants/${r.id}`} variant="outline" size="sm" icon={<ArrowSquareOut size={16} />}>
+                    Customer view
+                </LinkButton>
             </div>
 
-            <div className="bg-white rounded-lg shadow-md overflow-hidden mb-8">
-                <div className="relative h-64 w-full">
-                    {restaurant.image ? (
-                        <Image
-                            src={restaurant.image}
-                            alt={restaurant.name}
-                            fill
-                            className="object-cover"
-                            unoptimized={true}
-                        />
-                    ) : (
-                        <div className="bg-gray-200 h-full w-full flex items-center justify-center">
-                            <span className="text-gray-400">No image</span>
+            <Segmented
+                className="mt-8"
+                value={tab}
+                onChange={(t) => {
+                    setTab(t);
+                    router.replace(`?tab=${t}`, { scroll: false });
+                }}
+                options={[
+                    { value: "menu", label: "Menu" },
+                    { value: "details", label: "Details" },
+                    { value: "reviews", label: `Reviews (${r.review_count})` },
+                ]}
+            />
+
+            <div className="mt-6">
+                {tab === "menu" && (
+                    <>
+                        <div className="mb-4 flex items-center justify-between">
+                            <p className="text-sm text-muted">Toggle a dish off when it sells out. It hides instantly for customers.</p>
+                            <Button size="sm" onClick={() => setEditing("new")} icon={<Plus size={16} weight="bold" />}>
+                                Add dish
+                            </Button>
                         </div>
-                    )}
-                </div>
-                <div className="p-6">
-                    <h2 className="text-2xl font-bold text-gray-900">
-                        {restaurant.name}
-                    </h2>
-                    <p className="text-gray-500 mt-2">{restaurant.address}</p>
-                    <p className="text-gray-700 mt-4">
-                        {restaurant.description}
-                    </p>
-                </div>
-            </div>
-
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Menu Items</h2>
-                <Link href={`/dashboard/restaurants/${id}/menu/new`}>
-                    <button className="px-4 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600">
-                        Add Menu Item
-                    </button>
-                </Link>
-            </div>
-
-            {menuItems.length === 0 ? (
-                <div className="bg-white rounded-lg shadow-md p-8 text-center">
-                    <h3 className="text-xl text-gray-600 mb-4">
-                        No menu items yet
-                    </h3>
-                    <Link href={`/dashboard/restaurants/${id}/menu/new`}>
-                        <button className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-md">
-                            Add Your First Menu Item
-                        </button>
-                    </Link>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {menuItems.map((item) => (
-                        <div
-                            key={item.id}
-                            className="bg-white rounded-lg shadow-md overflow-hidden"
-                        >
-                            <div className="flex">
-                                <div className="relative h-32 w-32 flex-shrink-0">
-                                    {item.image ? (
-                                        <Image
-                                            src={item.image}
-                                            alt={item.name}
-                                            fill
-                                            className="object-cover"
-                                            unoptimized={true}
-                                        />
-                                    ) : (
-                                        <div className="bg-gray-200 h-full w-full flex items-center justify-center">
-                                            <span className="text-gray-400 text-xs">
-                                                No image
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="p-4 flex-grow">
-                                    <h3 className="text-lg font-medium text-gray-900">
-                                        {item.name}
-                                    </h3>
-                                    <p className="text-gray-600 text-sm mt-1 line-clamp-2">
-                                        {item.description}
-                                    </p>
-                                    <p className="text-gray-900 font-medium mt-2">
-                                        ${item.price}
-                                    </p>
-                                    <div className="flex space-x-2 mt-4">
-                                        <Link
-                                            href={`/dashboard/restaurants/${id}/menu/${item.id}/edit`}
-                                        >
-                                            <button className="text-sm px-3 py-1 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
-                                                Edit
-                                            </button>
-                                        </Link>
-                                        <button
-                                            onClick={() =>
-                                                handleDeleteMenuItem(item.id)
-                                            }
-                                            className="text-sm px-3 py-1 border border-red-300 rounded-md text-red-700 hover:bg-red-50"
-                                        >
-                                            Delete
-                                        </button>
-                                    </div>
-                                </div>
+                        {r.menu_items.length === 0 ? (
+                            <EmptyState icon={<Plus size={26} />} title="Your menu is empty" body="Add a few dishes to go live. Group them with categories like Mains, Sides and Drinks." action={<Button onClick={() => setEditing("new")}>Add your first dish</Button>} />
+                        ) : (
+                            <div className="space-y-8">
+                                {grouped.map(([cat, list]) => (
+                                    <section key={cat}>
+                                        <h2 className="mb-3 text-lg font-bold">{cat}</h2>
+                                        <ul className="divide-y divide-line rounded-3xl border border-line bg-surface">
+                                            {list.map((item) => (
+                                                <li key={item.id} className={cn("flex items-center gap-4 p-4", !item.is_available && "opacity-60")}>
+                                                    <CoverImage src={item.cover_image} alt="" cuisine={r.cuisine} iconSize={18} className="size-14 shrink-0 rounded-xl" />
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="font-semibold">{item.name}</p>
+                                                        <p className="truncate text-sm text-muted">{item.description}</p>
+                                                        <div className="mt-1">
+                                                            <DietaryTags item={item} compact />
+                                                        </div>
+                                                    </div>
+                                                    <span className="tabular hidden font-semibold sm:block">{money(item.price)}</span>
+                                                    <button
+                                                        onClick={() => toggleAvailable(item)}
+                                                        className={cn("hidden rounded-full px-3 py-1 text-xs font-bold sm:block", item.is_available ? "bg-ok-soft text-ok" : "bg-danger-soft text-danger")}
+                                                    >
+                                                        {item.is_available ? "Available" : "Sold out"}
+                                                    </button>
+                                                    <button onClick={() => setEditing(item)} aria-label={`Edit ${item.name}`} className="rounded-full p-2 text-muted hover:bg-surface-2 hover:text-ink">
+                                                        <PencilSimple size={18} />
+                                                    </button>
+                                                    <button onClick={() => setDeleting(item)} aria-label={`Delete ${item.name}`} className="rounded-full p-2 text-muted hover:bg-danger-soft hover:text-danger">
+                                                        <Trash size={18} />
+                                                    </button>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </section>
+                                ))}
                             </div>
+                        )}
+                    </>
+                )}
+
+                {tab === "details" && (
+                    <>
+                        <RestaurantForm restaurant={r} onSaved={() => mutate()} />
+                        <div className="mt-12 rounded-3xl border border-danger/30 p-5">
+                            <h2 className="font-bold text-danger">Delete restaurant</h2>
+                            <p className="mt-1 text-sm text-muted">Removes the restaurant, its menu and its order history. This can&apos;t be undone.</p>
+                            <Button variant="danger" size="sm" className="mt-4" onClick={() => setDeleteRestaurant(true)}>
+                                Delete {r.name}
+                            </Button>
                         </div>
-                    ))}
+                    </>
+                )}
+
+                {tab === "reviews" && <ReviewReplyList reviews={reviews ?? []} onReplied={() => mutateReviews()} />}
+            </div>
+
+            <Modal open={!!editing} onClose={() => setEditing(null)} title={editing === "new" ? "Add a dish" : "Edit dish"}>
+                {editing && (
+                    <MenuItemForm
+                        key={editing === "new" ? "new" : editing.id}
+                        restaurantId={r.id}
+                        cuisine={r.cuisine}
+                        item={editing === "new" ? undefined : editing}
+                        categories={categories.length ? categories : ["Mains", "Sides", "Drinks", "Desserts"]}
+                        onSaved={() => {
+                            setEditing(null);
+                            mutate();
+                        }}
+                    />
+                )}
+            </Modal>
+
+            <Modal open={!!deleting} onClose={() => setDeleting(null)} title={`Delete ${deleting?.name}?`}>
+                <p className="text-muted">If it&apos;s just sold out today, mark it unavailable instead. Deleting removes it for good.</p>
+                <div className="mt-6 flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => setDeleting(null)}>
+                        Cancel
+                    </Button>
+                    <Button variant="danger" onClick={removeItem}>
+                        Delete dish
+                    </Button>
                 </div>
-            )}
+            </Modal>
+
+            <Modal open={deleteRestaurant} onClose={() => setDeleteRestaurant(false)} title={`Delete ${r.name}?`}>
+                <p className="text-muted">This removes all dishes, orders and reviews for this restaurant.</p>
+                <div className="mt-6 flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => setDeleteRestaurant(false)}>
+                        Keep it
+                    </Button>
+                    <Button
+                        variant="danger"
+                        onClick={async () => {
+                            try {
+                                await request(`/restaurants/restaurant/${r.id}/`, { method: "DELETE" });
+                                toast("Restaurant deleted");
+                                router.push("/dashboard/restaurants");
+                            } catch (e) {
+                                toast((e as Error).message, "error");
+                            }
+                        }}
+                    >
+                        Delete forever
+                    </Button>
+                </div>
+            </Modal>
         </div>
     );
 }

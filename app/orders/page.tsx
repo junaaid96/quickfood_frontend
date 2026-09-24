@@ -1,132 +1,125 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { ordersApi } from "@/lib/api";
-import { Order } from "@/lib/types";
-import { useAuth } from "@/providers/auth-provider";
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { ArrowClockwise, ArrowRight, Receipt, Star } from "@phosphor-icons/react";
+import { useApi } from "@/lib/hooks";
+import { STATUS_COPY, isActive, orderProgress } from "@/lib/orders";
+import { clock, dateTime, money } from "@/lib/format";
+import type { Order } from "@/lib/types";
+import { useReorder } from "@/lib/useReorder";
+import { useAuth } from "@/providers/auth-provider";
+import { Badge, EmptyState, Segmented, Skeleton } from "@/components/ui/Bits";
+import { Button, LinkButton } from "@/components/ui/Button";
+import { CoverImage } from "@/components/ui/CoverImage";
 
 export default function OrdersPage() {
+    const { user, isLoading, isRestaurantOwner } = useAuth();
     const router = useRouter();
-    const { isAuthenticated, isRestaurantOwner } = useAuth();
-    const [orders, setOrders] = useState<Order[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [tab, setTab] = useState<"all" | "delivered" | "cancelled">("all");
+    const { data: orders } = useApi<Order[]>(user ? "/orders/" : null, { refreshInterval: 15000 });
+    const { reorder, busy } = useReorder();
 
     useEffect(() => {
-        if (!isAuthenticated) {
-            router.push("/login?redirect=/orders");
-            return;
-        }
+        if (!isLoading && !user) router.replace("/login?redirect=/orders");
+        if (isRestaurantOwner) router.replace("/dashboard/orders");
+    }, [isLoading, user, isRestaurantOwner, router]);
 
-        if (isRestaurantOwner) {
-            router.push("/dashboard");
-            return;
-        }
-
-        async function fetchOrders() {
-            try {
-                const data = await ordersApi.getAll();
-                setOrders(data);
-            } catch (error) {
-                console.error("Error fetching orders:", error);
-            } finally {
-                setLoading(false);
-            }
-        }
-
-        fetchOrders();
-    }, [isAuthenticated, router]);
-
-    if (loading) {
-        return (
-            <div className="flex justify-center items-center h-64 text-gray-600">
-                Loading...
-            </div>
-        );
-    }
-
-    if (orders.length === 0) {
-        return (
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <h1 className="text-3xl font-bold text-gray-900 mb-6">
-                    My Orders
-                </h1>
-                <div className="bg-white rounded-lg shadow-md p-8 text-center">
-                    <h2 className="text-xl text-gray-600 mb-4">
-                        You haven't placed any orders yet
-                    </h2>
-                    <Link href="/restaurants">
-                        <button className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-md">
-                            Browse Restaurants
-                        </button>
-                    </Link>
-                </div>
-            </div>
-        );
-    }
+    const active = orders?.filter((o) => isActive(o.status)) ?? [];
+    const past = (orders?.filter((o) => !isActive(o.status)) ?? []).filter((o) => tab === "all" || o.status === tab);
 
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-6">My Orders</h1>
+        <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-10">
+            <h1 className="text-3xl font-extrabold sm:text-4xl">Your orders</h1>
 
-            <div className="flex flex-col gap-3">
-                {orders.map((order) => (
-                    <Link href={`/orders/${order.id}`} key={order.id}>
-                        <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300">
-                            <div className="p-6">
-                                <div className="flex justify-between items-center mb-4">
-                                    <h2 className="text-xl font-semibold text-gray-900">
-                                        Order #{order.id}
-                                    </h2>
-                                    <span
-                                        className={`px-3 py-1 rounded-full text-sm font-medium ${
-                                            order.status === "delivered"
-                                                ? "bg-green-100 text-green-800"
-                                                : order.status ===
-                                                  "out_for_delivery"
-                                                ? "bg-blue-100 text-blue-800"
-                                                : order.status === "preparing"
-                                                ? "bg-yellow-100 text-yellow-800"
-                                                : "bg-gray-100 text-gray-800"
-                                        }`}
-                                    >
-                                        {order.status
-                                            .replace("_", " ")
-                                            .charAt(0)
-                                            .toUpperCase() +
-                                            order.status
-                                                .replace("_", " ")
-                                                .slice(1)}
-                                    </span>
-                                </div>
-
-                                <p className="text-gray-600 mb-2">
-                                    Restaurant: {order.restaurant}
-                                </p>
-
-                                <p className="text-gray-500 text-sm mb-4">
-                                    {new Date(
-                                        order.created_at || ""
-                                    ).toLocaleString()}
-                                </p>
-
-                                <div className="flex justify-between items-center">
-                                    <span className="text-gray-600">
-                                        {order.items?.length || 0}{" "}
-                                        {(order.items?.length || 0) === 1
-                                            ? "item"
-                                            : "items"}
-                                    </span>
-                                    <span className="text-gray-900 font-bold">
-                                        ${order.total_price}
-                                    </span>
-                                </div>
+            {!orders ? (
+                <div className="mt-8 space-y-4">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                        <Skeleton key={i} className="h-28 rounded-3xl" />
+                    ))}
+                </div>
+            ) : orders.length === 0 ? (
+                <div className="mt-8">
+                    <EmptyState icon={<Receipt size={26} />} title="No orders yet" body="Your first one is a few taps away." action={<LinkButton href="/restaurants">Find food</LinkButton>} />
+                </div>
+            ) : (
+                <>
+                    {active.length > 0 && (
+                        <section className="mt-8">
+                            <h2 className="text-sm font-bold tracking-wide text-muted uppercase">In progress</h2>
+                            <div className="mt-3 space-y-3">
+                                {active.map((o) => (
+                                    <Link key={o.id} href={`/orders/${o.id}`} className="block rounded-3xl border-2 border-brand/30 bg-surface p-5 transition hover:border-brand">
+                                        <div className="flex items-center gap-4">
+                                            <CoverImage src={o.restaurant_details.cover_image} alt="" cuisine={o.restaurant_details.cuisine} iconSize={22} className="size-14 shrink-0 rounded-2xl" />
+                                            <div className="min-w-0 flex-1">
+                                                <p className="truncate font-bold">{o.restaurant_details.name}</p>
+                                                <p className="text-sm text-brand">{STATUS_COPY[o.status].title}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                {o.estimated_delivery_at && <p className="tabular font-bold">{clock(o.estimated_delivery_at)}</p>}
+                                                <p className="text-xs text-muted">{o.scheduled_for ? "scheduled" : "estimated"}</p>
+                                            </div>
+                                            <ArrowRight size={18} className="text-muted" />
+                                        </div>
+                                        <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-surface-2">
+                                            <div className="h-full rounded-full bg-brand" style={{ width: `${Math.max(5, orderProgress(o) * 100)}%` }} />
+                                        </div>
+                                    </Link>
+                                ))}
                             </div>
+                        </section>
+                    )}
+
+                    <section className="mt-10">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <h2 className="text-sm font-bold tracking-wide text-muted uppercase">History</h2>
+                            <Segmented
+                                value={tab}
+                                onChange={setTab}
+                                options={[
+                                    { value: "all", label: "All" },
+                                    { value: "delivered", label: "Delivered" },
+                                    { value: "cancelled", label: "Cancelled" },
+                                ]}
+                            />
                         </div>
-                    </Link>
-                ))}
-            </div>
+                        <ul className="mt-3 divide-y divide-line rounded-3xl border border-line bg-surface">
+                            {past.length === 0 && <li className="p-6 text-center text-muted">Nothing here.</li>}
+                            {past.map((o) => (
+                                <li key={o.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:p-5">
+                                    <Link href={`/orders/${o.id}`} className="flex min-w-0 flex-1 items-center gap-4">
+                                        <CoverImage src={o.restaurant_details.cover_image} alt="" cuisine={o.restaurant_details.cuisine} iconSize={20} className="size-12 shrink-0 rounded-xl" />
+                                        <div className="min-w-0">
+                                            <p className="truncate font-semibold">{o.restaurant_details.name}</p>
+                                            <p className="truncate text-sm text-muted">
+                                                {dateTime(o.created_at)} · {o.items.reduce((s, i) => s + i.quantity, 0)} items · {money(o.total_price)}
+                                            </p>
+                                        </div>
+                                    </Link>
+                                    <div className="flex items-center gap-2">
+                                        {o.status === "cancelled" ? (
+                                            <Badge tone="danger">Cancelled</Badge>
+                                        ) : o.review ? (
+                                            <Badge tone="warn">
+                                                <Star size={12} weight="fill" /> {o.review.rating}
+                                            </Badge>
+                                        ) : (
+                                            <LinkButton href={`/orders/${o.id}`} variant="ghost" size="sm">
+                                                Rate
+                                            </LinkButton>
+                                        )}
+                                        <Button variant="outline" size="sm" loading={busy === o.id} onClick={() => reorder(o.id)} icon={<ArrowClockwise size={16} />}>
+                                            Reorder
+                                        </Button>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    </section>
+                </>
+            )}
         </div>
     );
 }

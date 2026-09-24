@@ -1,124 +1,209 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { restaurantApi } from "@/lib/api";
-import { Restaurant } from "@/lib/types";
-import Link from "next/link";
-import Image from "next/image";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { MagnifyingGlass, SlidersHorizontal, X } from "@phosphor-icons/react";
+import { useApi } from "@/lib/hooks";
+import { qs } from "@/lib/api";
+import { cn } from "@/lib/format";
+import type { Cuisine, Restaurant } from "@/lib/types";
+import { EmptyState } from "@/components/ui/Bits";
+import { Button } from "@/components/ui/Button";
+import { RestaurantCard, RestaurantCardSkeleton } from "@/components/restaurant/RestaurantCard";
 
-export default function RestaurantsPage() {
-    const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState("");
+const SORTS = [
+    { value: "recommended", label: "Recommended" },
+    { value: "rating", label: "Top rated" },
+    { value: "fastest", label: "Fastest" },
+    { value: "delivery_fee", label: "Lowest delivery fee" },
+    { value: "popular", label: "Most ordered" },
+    { value: "price_low", label: "Cheapest" },
+    { value: "newest", label: "Newest" },
+];
 
-    useEffect(() => {
-        async function fetchRestaurants() {
-            try {
-                const data = await restaurantApi.getAll();
-                setRestaurants(data);
-            } catch (error) {
-                console.error("Error fetching restaurants:", error);
-            } finally {
-                setLoading(false);
-            }
-        }
+const TOGGLES = [
+    { key: "open_now", label: "Open now", value: "1" },
+    { key: "free_delivery", label: "Free delivery", value: "1" },
+    { key: "min_rating", label: "Rated 4.5+", value: "4.5" },
+    { key: "max_eta", label: "Under 45 min", value: "45" },
+    { key: "dietary", label: "Vegetarian", value: "vegetarian" },
+    { key: "dietary", label: "Vegan", value: "vegan" },
+    { key: "dietary", label: "Gluten free", value: "gluten_free" },
+];
 
-        fetchRestaurants();
-    }, []);
+const FILTER_KEYS = ["search", "cuisine", "ordering", "open_now", "free_delivery", "min_rating", "max_eta", "dietary", "price_level"];
 
-    const filteredRestaurants = restaurants.filter(
-        (restaurant) =>
-            restaurant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            restaurant.address.toLowerCase().includes(searchTerm.toLowerCase())
+export default function DiscoverPage() {
+    return (
+        <Suspense>
+            <Discover />
+        </Suspense>
     );
+}
 
-    if (loading) {
-        return (
-            <div className="flex justify-center items-center h-64 text-gray-600">
-                Loading restaurants...
-            </div>
-        );
-    }
+function Discover() {
+    const params = useSearchParams();
+    const router = useRouter();
+    const pathname = usePathname();
+    const [search, setSearch] = useState(params.get("search") ?? "");
+    const pushed = useRef(params.get("search") ?? "");
+
+    const current = useMemo(() => {
+        const o: Record<string, string> = {};
+        FILTER_KEYS.forEach((k) => {
+            const v = params.get(k);
+            if (v) o[k] = v;
+        });
+        return o;
+    }, [params]);
+
+    const update = (patch: Record<string, string | undefined>) => {
+        const next = { ...current, ...patch };
+        router.replace(`${pathname}${qs(next)}`, { scroll: false });
+    };
+
+    // Debounce the search box into the URL.
+    useEffect(() => {
+        if (pushed.current === search.trim()) return;
+        const t = setTimeout(() => {
+            pushed.current = search.trim();
+            update({ search: search.trim() || undefined });
+        }, 300);
+        return () => clearTimeout(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [search]);
+
+    // Follow outside navigation (e.g. the navbar search) without clobbering what is being typed.
+    useEffect(() => {
+        const fromUrl = params.get("search") ?? "";
+        if (fromUrl !== pushed.current) {
+            pushed.current = fromUrl;
+            setSearch(fromUrl);
+        }
+    }, [params]);
+
+    const { data: restaurants, isLoading, error } = useApi<Restaurant[]>(`/restaurants/restaurant/${qs(current)}`, { keepPreviousData: true });
+    const { data: cuisines } = useApi<Cuisine[]>(`/restaurants/restaurant/cuisines/`);
+
+    const selectedCuisines = (current.cuisine ?? "").split(",").filter(Boolean);
+    const toggleCuisine = (value: string) => {
+        const next = selectedCuisines.includes(value) ? selectedCuisines.filter((c) => c !== value) : [...selectedCuisines, value];
+        update({ cuisine: next.join(",") || undefined });
+    };
+    const activeCount = Object.keys(current).filter((k) => k !== "ordering").length;
 
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900 mb-4">
-                    Restaurants
-                </h1>
-                <div className="relative">
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10">
+            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                <div>
+                    <h1 className="text-3xl font-extrabold sm:text-4xl">
+                        {current.search ? <>Results for &ldquo;{current.search}&rdquo;</> : "Discover"}
+                    </h1>
+                    <p className="mt-1 text-muted">
+                        {restaurants ? `${restaurants.length} ${restaurants.length === 1 ? "kitchen" : "kitchens"}` : "Finding kitchens"}
+                        {current.search && " serving what you searched, dishes included"}
+                    </p>
+                </div>
+                <label className="flex items-center gap-2 text-sm">
+                    <span className="text-muted">Sort by</span>
+                    <select
+                        value={current.ordering ?? "recommended"}
+                        onChange={(e) => update({ ordering: e.target.value === "recommended" ? undefined : e.target.value })}
+                        className="rounded-full border border-line bg-surface px-3 py-2 font-semibold focus:border-brand focus:outline-none"
+                    >
+                        {SORTS.map((s) => (
+                            <option key={s.value} value={s.value}>
+                                {s.label}
+                            </option>
+                        ))}
+                    </select>
+                </label>
+            </div>
+
+            <div className="sticky top-16 z-20 -mx-4 mt-6 border-b border-line/60 bg-bg/90 px-4 pt-2 pb-3 backdrop-blur-md sm:mx-0 sm:rounded-b-2xl sm:px-0">
+                <label className="flex h-12 items-center gap-3 rounded-2xl border border-line bg-surface px-4 focus-within:border-brand">
+                    <MagnifyingGlass size={20} className="text-muted" />
                     <input
-                        type="text"
-                        placeholder="Search restaurants by name or location..."
-                        className="w-full p-3 border border-gray-300 rounded-lg text-gray-600"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Search restaurants, cuisines or dishes"
+                        aria-label="Search restaurants, cuisines or dishes"
+                        className="w-full bg-transparent placeholder:text-muted/70 focus:outline-none"
                     />
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-                        <svg
-                            className="h-5 w-5 text-gray-400"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                            />
-                        </svg>
-                    </div>
+                    {search && (
+                        <button onClick={() => setSearch("")} aria-label="Clear search" className="text-muted hover:text-ink">
+                            <X size={18} />
+                        </button>
+                    )}
+                </label>
+
+                <div className="no-scrollbar mt-3 flex gap-2 overflow-x-auto">
+                    <span className="inline-flex shrink-0 items-center gap-1.5 pr-1 text-sm text-muted">
+                        <SlidersHorizontal size={16} />
+                        {activeCount > 0 && <span className="tabular font-semibold text-ink">{activeCount}</span>}
+                    </span>
+                    {TOGGLES.map((t) => {
+                        const on = current[t.key] === t.value;
+                        return (
+                            <Chip key={t.label} on={on} onClick={() => update({ [t.key]: on ? undefined : t.value })}>
+                                {t.label}
+                            </Chip>
+                        );
+                    })}
+                    <span className="mx-1 w-px shrink-0 bg-line" />
+                    {cuisines?.map((c) => (
+                        <Chip key={c.value} on={selectedCuisines.includes(c.value)} onClick={() => toggleCuisine(c.value)}>
+                            {c.label}
+                        </Chip>
+                    ))}
                 </div>
             </div>
 
-            {filteredRestaurants.length === 0 ? (
-                <div className="text-center py-10">
-                    <p className="text-gray-500">
-                        No restaurants found matching your search.
-                    </p>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredRestaurants.map((restaurant) => (
-                        <Link
-                            href={`/restaurants/${restaurant.id}`}
-                            key={restaurant.id}
-                        >
-                            <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300">
-                                <div className="relative h-48 w-full">
-                                    {restaurant.image ? (
-                                        <Image
-                                            src={restaurant.image}
-                                            alt={restaurant.name}
-                                            fill
-                                            className="object-cover"
-                                            unoptimized={true}
-                                        />
-                                    ) : (
-                                        <div className="bg-gray-200 h-full w-full flex items-center justify-center">
-                                            <span className="text-gray-400">
-                                                No image
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="p-4">
-                                    <h2 className="text-xl font-semibold text-gray-900">
-                                        {restaurant.name}
-                                    </h2>
-                                    <p className="text-gray-500 mt-1">
-                                        {restaurant.address}
-                                    </p>
-                                    <p className="text-gray-600 mt-2 line-clamp-2">
-                                        {restaurant.description}
-                                    </p>
-                                </div>
+            <div className="mt-8">
+                {error ? (
+                    <EmptyState icon={<X size={26} />} title="Could not load restaurants" body={error.message} />
+                ) : isLoading && !restaurants ? (
+                    <div className="grid gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
+                        {Array.from({ length: 6 }).map((_, i) => (
+                            <RestaurantCardSkeleton key={i} />
+                        ))}
+                    </div>
+                ) : restaurants && restaurants.length === 0 ? (
+                    <EmptyState
+                        icon={<MagnifyingGlass size={26} />}
+                        title="Nothing matches that combo"
+                        body="Try removing a filter or searching for a dish instead of a restaurant."
+                        action={
+                            <Button variant="outline" onClick={() => router.replace(pathname)}>
+                                Clear all filters
+                            </Button>
+                        }
+                    />
+                ) : (
+                    <div className="grid gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
+                        {restaurants?.map((r, i) => (
+                            <div key={r.id} className="animate-rise" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
+                                <RestaurantCard restaurant={r} priority={i < 3} />
                             </div>
-                        </Link>
-                    ))}
-                </div>
-            )}
+                        ))}
+                    </div>
+                )}
+            </div>
         </div>
+    );
+}
+
+function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
+    return (
+        <button
+            onClick={onClick}
+            aria-pressed={on}
+            className={cn(
+                "shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-medium whitespace-nowrap transition",
+                on ? "border-ink bg-ink text-bg" : "border-line bg-surface text-ink hover:border-ink/40",
+            )}
+        >
+            {children}
+        </button>
     );
 }

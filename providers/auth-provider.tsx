@@ -1,37 +1,30 @@
 "use client";
 
-import {
-    createContext,
-    useContext,
-    useEffect,
-    useState,
-    ReactNode,
-} from "react";
-import { authApi } from "@/lib/api";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { mutate } from "swr";
+import { onSessionExpired, request, tokens } from "@/lib/api";
+import type { Role, User } from "@/lib/types";
 
-type User = {
-    id: number;
+export type RegisterInput = {
     username: string;
     email: string;
-    role: string;
+    password: string;
+    role: Role;
+    first_name: string;
+    last_name: string;
+    phone_number?: string;
 };
 
 type AuthContextType = {
     user: User | null;
     isLoading: boolean;
-    login: (username: string, password: string) => Promise<void>;
-    register: (
-        username: string,
-        first_name: string,
-        last_name: string,
-        email: string,
-        password: string,
-        role: string,
-    ) => Promise<void>;
-    logout: () => void;
     isAuthenticated: boolean;
     isRestaurantOwner: boolean;
+    login: (username: string, password: string, redirectTo?: string | null) => Promise<User>;
+    register: (data: RegisterInput) => Promise<void>;
+    logout: () => void;
+    refreshUser: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -41,83 +34,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [isLoading, setIsLoading] = useState(true);
     const router = useRouter();
 
-    useEffect(() => {
-        // Check if user is logged in
-        const checkAuth = async () => {
-            try {
-                const token = localStorage.getItem("token");
-                if (token) {
-                    // Get user profile
-                    const profile = await authApi.getProfile();
-                    setUser(profile);
-                }
-            } catch (error) {
-                console.error("Authentication error:", error);
-                localStorage.removeItem("token");
-                localStorage.removeItem("refreshToken");
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        checkAuth();
+    const refreshUser = useCallback(async () => {
+        if (!tokens.access) {
+            setUser(null);
+            return;
+        }
+        try {
+            setUser(await request<User>("/accounts/profile/"));
+        } catch {
+            tokens.clear();
+            setUser(null);
+        }
     }, []);
 
-    const login = async (username: string, password: string) => {
-        setIsLoading(true);
-        try {
-            const { access, refresh } = await authApi.login({
-                username,
-                password,
-            });
-            localStorage.setItem("token", access);
-            localStorage.setItem("refreshToken", refresh);
+    useEffect(() => {
+        refreshUser().finally(() => setIsLoading(false));
+        return onSessionExpired(() => setUser(null));
+    }, [refreshUser]);
 
-            // Get user profile
-            const profile = await authApi.getProfile();
-            setUser(profile);
-
-            router.push("/restaurants");
-        } catch (error) {
-            console.error("Login error:", error);
-            throw error;
-        } finally {
-            setIsLoading(false);
-        }
+    const login = async (username: string, password: string, redirectTo?: string | null) => {
+        const { access, refresh } = await request<{ access: string; refresh: string }>("/accounts/token/", {
+            method: "POST",
+            body: { username, password },
+            auth: false,
+        });
+        tokens.set(access, refresh);
+        const profile = await request<User>("/accounts/profile/");
+        setUser(profile);
+        // Clear any data cached for an anonymous visitor (favourites, etc).
+        mutate(() => true, undefined, { revalidate: true });
+        const fallback = profile.role === "restaurant_owner" ? "/dashboard" : "/restaurants";
+        router.push(redirectTo && redirectTo.startsWith("/") ? redirectTo : fallback);
+        return profile;
     };
 
-    const register = async (
-        username: string, 
-        email: string, 
-        password: string, 
-        role: string,
-        first_name: string,
-        last_name: string
-    ) => {
-        setIsLoading(true);
-        try {
-            await authApi.register({ 
-                username, 
-                email, 
-                password, 
-                role,
-                first_name,
-                last_name
-            });
-            router.push('/login');
-        } catch (error) {
-            console.error('Registration error:', error);
-            throw error;
-        } finally {
-            setIsLoading(false);
-        }
+    const register = async (data: RegisterInput) => {
+        await request("/accounts/register/", { method: "POST", body: data, auth: false });
     };
 
     const logout = () => {
-        localStorage.removeItem("token");
-        localStorage.removeItem("refreshToken");
+        tokens.clear();
         setUser(null);
-        router.push("/login");
+        mutate(() => true, undefined, { revalidate: false });
+        router.push("/");
     };
 
     return (
@@ -125,11 +84,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             value={{
                 user,
                 isLoading,
+                isAuthenticated: !!user,
+                isRestaurantOwner: user?.role === "restaurant_owner",
                 login,
                 register,
                 logout,
-                isAuthenticated: !!user,
-                isRestaurantOwner: user?.role === "restaurant_owner",
+                refreshUser,
             }}
         >
             {children}

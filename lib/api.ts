@@ -1,139 +1,165 @@
-import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
-import { getSession } from './auth';
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://quickfood-backend-hoi3.onrender.com/api").replace(/\/$/, "");
 
-const API_URL = 'https://quickfood-backend-hoi3.onrender.com/api';
+const TOKEN_KEY = "token";
+const REFRESH_KEY = "refreshToken";
 
-type RequestMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+export class ApiError extends Error {
+    status: number;
+    data: unknown;
+    fieldErrors: Record<string, string>;
 
-export async function fetchApi<T>(
-    endpoint: string,
-    method: RequestMethod = 'GET',
-    data?: any,
-    requireAuth: boolean = true
-): Promise<T> {
-    const url = `${API_URL}${endpoint}`;
-    const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-    };
-
-    if (requireAuth) {
-        const session = await getSession();
-        if (session?.token) {
-            headers['Authorization'] = `Bearer ${session.token}`;
-        }
-    }
-
-    const config: AxiosRequestConfig = {
-        method,
-        url,
-        headers,
-        data: method !== 'GET' ? data : undefined,
-        params: method === 'GET' ? data : undefined,
-    };
-
-    try {
-        const response: AxiosResponse<T> = await axios(config);
-        return response.data;
-    } catch (error: any) {
-        if (error.response) {
-            // The request was made and the server responded with a status code
-            // that falls out of the range of 2xx
-            const errorData = error.response.data;
-            const customError = new Error(errorData.detail || 'An error occurred');
-            (customError as any).detail = errorData.detail;
-            (customError as any).status = error.response.status;
-            throw customError;
-        } else if (error.request) {
-            // The request was made but no response was received
-            throw new Error('No response received from server');
-        } else {
-            // Something happened in setting up the request
-            throw new Error('Error setting up request: ' + error.message);
-        }
+    constructor(message: string, status: number, data: unknown, fieldErrors: Record<string, string> = {}) {
+        super(message);
+        this.status = status;
+        this.data = data;
+        this.fieldErrors = fieldErrors;
     }
 }
 
-// Auth API
-export const authApi = {
-    login: (credentials: { username: string; password: string }) =>
-        fetchApi<{ access: string; refresh: string }>('/accounts/token/', 'POST', credentials, false),
-
-    register: (userData: { 
-        username: string; 
-        email: string; 
-        password: string; 
-        role: string;
-        first_name: string;
-        last_name: string;
-    }) =>
-        fetchApi<{ id: number; username: string; email: string }>(
-            '/accounts/register/', 
-            'POST', 
-            userData, 
-            false
-        ),
-
-    refreshToken: (refreshToken: string) =>
-        fetchApi<{ access: string }>('/accounts/token/refresh/', 'POST', { refresh: refreshToken }, false),
-
-    getProfile: () =>
-        fetchApi<any>('/accounts/profile/', 'GET'),
-
-    updateProfile: (profileData: any) =>
-        fetchApi<any>('/accounts/profile/', 'PATCH', profileData),
-};
-
-// Restaurant API
-export const restaurantApi = {
-    getAll: (params?: URLSearchParams) => {
-        const queryString = params ? `?${params.toString()}` : '';
-        return fetchApi<any[]>(`/restaurants/restaurant/${queryString}`, 'GET', undefined, false);
+export const tokens = {
+    get access() {
+        return typeof window === "undefined" ? null : localStorage.getItem(TOKEN_KEY);
     },
-
-    getById: (id: string) =>
-        fetchApi<any>(`/restaurants/restaurant/${id}/`, 'GET', undefined, false),
-
-    create: (restaurantData: any) =>
-        fetchApi<any>('/restaurants/restaurant/', 'POST', restaurantData),
-
-    update: (id: string, restaurantData: any) =>
-        fetchApi<any>(`/restaurants/restaurant/${id}/`, 'PATCH', restaurantData),
-
-    delete: (id: string) =>
-        fetchApi<void>(`/restaurants/restaurant/${id}/`, 'DELETE'),
-};
-
-// Menu Items API
-export const menuItemsApi = {
-    getAll: (restaurantId?: string) => {
-        const params = restaurantId ? `?restaurant=${restaurantId}` : '';
-        return fetchApi<any[]>(`/restaurants/menu-items/${params}`, 'GET', undefined, false);
+    get refresh() {
+        return typeof window === "undefined" ? null : localStorage.getItem(REFRESH_KEY);
     },
-
-    getById: (id: string) =>
-        fetchApi<any>(`/restaurants/menu-items/${id}/`, 'GET', undefined, false),
-
-    create: (menuItemData: any) =>
-        fetchApi<any>('/restaurants/menu-items/', 'POST', menuItemData),
-
-    update: (id: string, menuItemData: any) =>
-        fetchApi<any>(`/restaurants/menu-items/${id}/`, 'PATCH', menuItemData),
-
-    delete: (id: string) =>
-        fetchApi<void>(`/restaurants/menu-items/${id}/`, 'DELETE'),
+    set(access: string, refresh?: string) {
+        localStorage.setItem(TOKEN_KEY, access);
+        if (refresh) localStorage.setItem(REFRESH_KEY, refresh);
+    },
+    clear() {
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(REFRESH_KEY);
+    },
 };
 
-// Orders API
-export const ordersApi = {
-    getAll: () =>
-        fetchApi<any[]>('/orders/', 'GET'),
+/* ---- Slow request tracking: the free API host sleeps, so tell people when it is waking up. ---- */
+type SlowListener = (slow: boolean) => void;
+const slowListeners = new Set<SlowListener>();
+let slowCount = 0;
+export function onSlowNetwork(listener: SlowListener) {
+    slowListeners.add(listener);
+    return () => {
+        slowListeners.delete(listener);
+    };
+}
+function markSlow(delta: number) {
+    slowCount = Math.max(0, slowCount + delta);
+    slowListeners.forEach((l) => l(slowCount > 0));
+}
 
-    getById: (id: string) =>
-        fetchApi<any>(`/orders/${id}/`, 'GET'),
+/* ---- Session expiry: auth provider subscribes to log the user out. ---- */
+const expiredListeners = new Set<() => void>();
+export function onSessionExpired(listener: () => void) {
+    expiredListeners.add(listener);
+    return () => {
+        expiredListeners.delete(listener);
+    };
+}
 
-    create: (orderData: any) =>
-        fetchApi<any>('/orders/', 'POST', orderData),
+function flattenErrors(data: unknown): { message: string; fields: Record<string, string> } {
+    if (!data || typeof data !== "object") return { message: "Something went wrong.", fields: {} };
+    const fields: Record<string, string> = {};
+    const messages: string[] = [];
+    const visit = (value: unknown, key?: string) => {
+        if (typeof value === "string") {
+            if (key && key !== "detail" && key !== "non_field_errors") fields[key] = fields[key] || value;
+            messages.push(value);
+        } else if (Array.isArray(value)) {
+            value.forEach((v) => visit(v, key));
+        } else if (value && typeof value === "object") {
+            Object.entries(value).forEach(([k, v]) => visit(v, key ?? k));
+        }
+    };
+    visit(data);
+    return { message: messages[0] || "Something went wrong.", fields };
+}
 
-    updateStatus: (id: string, status: string) =>
-        fetchApi<any>(`/orders/${id}/`, 'PATCH', { status }),
-};
+let refreshing: Promise<boolean> | null = null;
+async function refreshAccess(): Promise<boolean> {
+    const refresh = tokens.refresh;
+    if (!refresh) return false;
+    refreshing ??= fetch(`${API_URL}/accounts/token/refresh/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh }),
+    })
+        .then(async (res) => {
+            if (!res.ok) return false;
+            const data = await res.json();
+            tokens.set(data.access);
+            return true;
+        })
+        .catch(() => false)
+        .finally(() => {
+            refreshing = null;
+        });
+    return refreshing;
+}
+
+type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+
+export async function request<T>(
+    path: string,
+    { method = "GET", body, auth = true }: { method?: Method; body?: unknown; auth?: boolean } = {},
+    retried = false,
+): Promise<T> {
+    const headers: Record<string, string> = {};
+    const isForm = typeof FormData !== "undefined" && body instanceof FormData;
+    if (body !== undefined && !isForm) headers["Content-Type"] = "application/json";
+    const access = tokens.access;
+    if (auth && access) headers["Authorization"] = `Bearer ${access}`;
+
+    let flaggedSlow = false;
+    const slowTimer = setTimeout(() => {
+        flaggedSlow = true;
+        markSlow(1);
+    }, 3500);
+    let res: Response;
+    try {
+        res = await fetch(`${API_URL}${path}`, {
+            method,
+            headers,
+            body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
+        });
+    } catch {
+        throw new ApiError("Can't reach QuickFood right now. Check your connection and try again.", 0, null);
+    } finally {
+        clearTimeout(slowTimer);
+        if (flaggedSlow) markSlow(-1);
+    }
+
+    if (res.status === 401 && auth && access && !retried) {
+        if (await refreshAccess()) return request<T>(path, { method, body, auth }, true);
+        tokens.clear();
+        expiredListeners.forEach((l) => l());
+    }
+
+    if (res.status === 204) return undefined as T;
+    const text = await res.text();
+    const data = text ? safeJson(text) : null;
+    if (!res.ok) {
+        const { message, fields } = flattenErrors(data);
+        throw new ApiError(message, res.status, data, fields);
+    }
+    return data as T;
+}
+
+function safeJson(text: string) {
+    try {
+        return JSON.parse(text);
+    } catch {
+        return { detail: text.slice(0, 200) };
+    }
+}
+
+export const fetcher = <T,>(path: string) => request<T>(path);
+
+export function qs(params: Record<string, string | number | boolean | undefined | null>): string {
+    const search = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== "" && v !== false) search.set(k, String(v));
+    });
+    const s = search.toString();
+    return s ? `?${s}` : "";
+}

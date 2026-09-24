@@ -1,131 +1,96 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useAuth } from "@/providers/auth-provider";
 import Link from "next/link";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Eye, EyeSlash } from "@phosphor-icons/react";
+import { useAuth } from "@/providers/auth-provider";
+import { ApiError } from "@/lib/api";
+import { Button } from "@/components/ui/Button";
+import { Field, Input } from "@/components/ui/Field";
+
+const SHOW_DEMO = process.env.NEXT_PUBLIC_DEMO_LOGINS !== "false";
 
 export default function LoginPage() {
-    const router = useRouter();
-    const searchParams = useSearchParams();
-    const { login, isLoading } = useAuth();
+    return (
+        <Suspense>
+            <LoginForm />
+        </Suspense>
+    );
+}
+
+function LoginForm() {
+    const { login } = useAuth();
+    const params = useSearchParams();
+    const redirect = params.get("redirect");
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
+    const [show, setShow] = useState(false);
     const [error, setError] = useState("");
+    const [loading, setLoading] = useState(false);
 
-    const redirectPath = searchParams.get("redirect") || "/restaurants";
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const submit = async (u = username, p = password) => {
         setError("");
-
+        setLoading(true);
         try {
-            await login(username, password);
-            router.push(redirectPath);
-        } catch (err: any) {
-            if (err.detail) {
-                setError(err.detail);
-            } else {
-                setError(err.message || "Failed to login. Please check your credentials.");
-            }
-            
-            if (err.status === 401) {
-                setError("No active account found with the given credentials");
-            }
+            await login(u, p, redirect);
+        } catch (e) {
+            setError(e instanceof ApiError && e.status === 401 ? "That username and password don't match." : (e as Error).message);
+            setLoading(false);
         }
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-            <div className="max-w-md w-full space-y-8">
-                <div>
-                    <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-                        Sign in to your account
-                    </h2>
-                </div>
+        <div className="animate-rise">
+            <h1 className="text-4xl font-extrabold">Welcome back</h1>
+            <p className="mt-2 text-muted">
+                {redirect === "/checkout" ? "Log in to finish your order. Your basket is saved." : "Log in to order, track and earn rewards."}
+            </p>
 
-                {error && (
-                    <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
-                        <div className="flex">
-                            <div className="flex-shrink-0">
-                                <svg
-                                    className="h-5 w-5 text-red-500"
-                                    viewBox="0 0 20 20"
-                                    fill="currentColor"
-                                >
-                                    <path
-                                        fillRule="evenodd"
-                                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                                        clipRule="evenodd"
-                                    />
-                                </svg>
-                            </div>
-                            <div className="ml-3">
-                                <p className="text-sm text-red-700">{error}</p>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-                    <div className="rounded-md shadow-sm -space-y-px">
-                        <div>
-                            <label htmlFor="username" className="sr-only">
-                                Username
-                            </label>
-                            <input
-                                id="username"
-                                name="username"
-                                type="text"
-                                autoComplete="username"
-                                required
-                                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm"
-                                placeholder="Username"
-                                value={username}
-                                onChange={(e) => setUsername(e.target.value)}
-                            />
-                        </div>
-                        <div>
-                            <label htmlFor="password" className="sr-only">
-                                Password
-                            </label>
-                            <input
-                                id="password"
-                                name="password"
-                                type="password"
-                                autoComplete="current-password"
-                                required
-                                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm"
-                                placeholder="Password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                            />
-                        </div>
-                    </div>
-
-                    <div>
-                        <button
-                            type="submit"
-                            disabled={isLoading}
-                            className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-orange-500 hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50"
-                        >
-                            {isLoading ? "Loading..." : "Sign in"}
+            <form
+                className="mt-8 space-y-4"
+                onSubmit={(e) => {
+                    e.preventDefault();
+                    submit();
+                }}
+            >
+                <Field label="Username">
+                    <Input autoComplete="username" required value={username} onChange={(e) => setUsername(e.target.value)} />
+                </Field>
+                <Field label="Password">
+                    <div className="relative">
+                        <Input type={show ? "text" : "password"} autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} className="pr-11" />
+                        <button type="button" onClick={() => setShow(!show)} aria-label={show ? "Hide password" : "Show password"} className="absolute inset-y-0 right-3 text-muted hover:text-ink">
+                            {show ? <EyeSlash size={20} /> : <Eye size={20} />}
                         </button>
                     </div>
+                </Field>
+                {error && <p role="alert" className="rounded-xl bg-danger-soft px-4 py-3 text-sm text-danger">{error}</p>}
+                <Button type="submit" size="lg" loading={loading} className="w-full">
+                    Log in
+                </Button>
+            </form>
 
-                    <div className="text-center">
-                        <p className="text-sm text-gray-600">
-                            Don't have an account?{" "}
-                            <Link
-                                href="/register"
-                                className="font-medium text-orange-500 hover:text-orange-400"
-                            >
-                                Sign up
-                            </Link>
-                        </p>
+            {SHOW_DEMO && (
+                <div className="mt-6 rounded-2xl border border-dashed border-line p-4">
+                    <p className="text-sm font-semibold">Just looking around?</p>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                        <Button variant="outline" size="sm" disabled={loading} onClick={() => submit("demo_customer", "quickfood123")}>
+                            Demo customer
+                        </Button>
+                        <Button variant="outline" size="sm" disabled={loading} onClick={() => submit("demo_owner", "quickfood123")}>
+                            Demo restaurant
+                        </Button>
                     </div>
-                </form>
-            </div>
+                </div>
+            )}
+
+            <p className="mt-8 text-center text-muted">
+                New here?{" "}
+                <Link href={`/register${redirect ? `?redirect=${encodeURIComponent(redirect)}` : ""}`} className="font-semibold text-brand hover:underline">
+                    Create an account
+                </Link>
+            </p>
         </div>
     );
 }
