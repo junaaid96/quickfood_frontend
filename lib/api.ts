@@ -1,4 +1,4 @@
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://quickfood-backend-hoi3.onrender.com/api").replace(/\/$/, "");
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://quickfood-backend-bice.vercel.app/api").replace(/\/$/, "");
 
 const TOKEN_KEY = "token";
 const REFRESH_KEY = "refreshToken";
