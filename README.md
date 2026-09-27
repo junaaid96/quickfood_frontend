@@ -46,7 +46,7 @@ To run against a local backend, set `NEXT_PUBLIC_API_URL=http://localhost:8000/a
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `NEXT_PUBLIC_API_URL` | `https://quickfood-backend-hoi3.onrender.com/api` | Backend API base URL |
+| `NEXT_PUBLIC_API_URL` | `https://quickfood-backend-bice.vercel.app/api` | Backend API base URL |
 | `NEXT_PUBLIC_CURRENCY_SYMBOL` | `$` | Currency shown in prices |
 | `NEXT_PUBLIC_DEMO_LOGINS` | `true` | Show demo login buttons |
 
