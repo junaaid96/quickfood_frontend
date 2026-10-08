@@ -15,8 +15,27 @@ export default function Footer() {
                 <FooterCol title="Account" links={[["/orders", "Orders"], ["/profile", "Rewards"], ["/login", "Log in"]]} />
                 <FooterCol title="Partners" links={[["/register?role=restaurant_owner", "Add your restaurant"], ["/dashboard", "Partner dashboard"]]} />
             </div>
-            <div className="border-t border-line py-5 text-center text-xs text-muted">
-                &copy; {new Date().getFullYear()} QuickFood. Made for hungry people.
+            <div className="border-t border-line py-5 text-xs text-muted">
+                <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 text-center sm:px-6 md:flex-row md:text-left">
+                    <p>&copy; {new Date().getFullYear()} QuickFood. Made for hungry people.</p>
+                    <a
+                        href="https://junaidul.pro.bd/codejborg"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="Developed by CodeJBorg — visit developer website"
+                        className="group inline-flex shrink-0 items-center gap-2 rounded-full border border-line bg-surface/60 py-1.5 pr-3 pl-1.5 font-mono text-[11px] tracking-wide text-muted transition-colors duration-300 hover:border-muted hover:bg-surface hover:text-ink"
+                    >
+                        <span className="flex size-6 items-center justify-center rounded-full bg-brand text-brand-ink">
+                            <svg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m18 16 4-4-4-4" /><path d="m6 8-4 4 4 4" /><path d="m14.5 4-5 16" /></svg>
+                        </span>
+                        <span>Developed by</span>
+                        <span className="font-semibold text-ink">
+                            <span className="text-brand">&lt;</span>CodeJBorg<span className="text-brand"> /&gt;</span>
+                        </span>
+                        <span aria-hidden="true" className="inline-block h-3.5 w-[2px] bg-brand motion-safe:animate-pulse" />
+                        <svg className="size-3.5 opacity-40 transition-all duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:opacity-100" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 7h10v10" /><path d="M7 17 17 7" /></svg>
+                    </a>
+                </div>
             </div>
         </footer>
     );
