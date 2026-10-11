@@ -5,15 +5,18 @@ import { clock, cn } from "@/lib/format";
 
 export function StatusTimeline({ order }: { order: Order }) {
     const current = stepIndex(order.status);
-    const at = (status: string) => order.events.find((e) => e.status === status)?.created_at;
+    const event = (status: string) => order.events.find((e) => e.status === status);
 
     if (order.status === "cancelled") {
-        const ev = order.events.find((e) => e.status === "cancelled");
+        const ev = event("cancelled");
+        const by = order.cancelled_by === "restaurant" ? `by ${order.restaurant_details.name}` : order.cancelled_by === "customer" ? "by you" : "";
         return (
             <div className="flex items-start gap-3 rounded-2xl bg-danger-soft p-4 text-danger">
                 <X size={22} weight="bold" className="mt-0.5 shrink-0" />
                 <div>
-                    <p className="font-semibold">Cancelled {ev && `at ${clock(ev.created_at)}`}</p>
+                    <p className="font-semibold">
+                        Cancelled {by} {ev && `at ${clock(ev.created_at)}`}
+                    </p>
                     {ev?.note && <p className="text-sm opacity-80">{ev.note}</p>}
                 </div>
             </div>
@@ -21,13 +24,15 @@ export function StatusTimeline({ order }: { order: Order }) {
     }
 
     return (
-        <ol className="relative">
+        <ol className="relative" aria-label="Order progress">
             {FLOW.map((s, i) => {
                 const done = i < current || order.status === "delivered";
                 const now = i === current && order.status !== "delivered";
-                const time = at(s);
+                const ev = event(s);
+                // Older orders skipped the "ready" step; don't show a hole in their history.
+                if (s === "ready" && !ev && i < current) return null;
                 return (
-                    <li key={s} className="relative flex gap-4 pb-6 last:pb-0">
+                    <li key={s} className="relative flex gap-4 pb-6 last:pb-0" aria-current={now ? "step" : undefined}>
                         {i < FLOW.length - 1 && (
                             <span className={cn("absolute top-7 left-[13px] h-[calc(100%-22px)] w-0.5", done ? "bg-brand" : "bg-line")} aria-hidden />
                         )}
@@ -41,11 +46,16 @@ export function StatusTimeline({ order }: { order: Order }) {
                         >
                             {done ? <Check size={14} weight="bold" /> : now ? <span className="size-2.5 animate-ping rounded-full bg-brand" /> : null}
                         </span>
-                        <div className="-mt-0.5 flex-1">
+                        <div className="-mt-0.5 min-w-0 flex-1">
                             <p className={cn("font-semibold", !done && !now && "text-muted")}>{STATUS_COPY[s].short}</p>
                             {now && <p className="text-sm text-muted">{STATUS_COPY[s].body}</p>}
+                            {now && STATUS_COPY[s].next && <p className="mt-1 text-xs font-medium text-brand">Next: {STATUS_COPY[s].next}</p>}
+                            {s === "confirmed" && order.prep_minutes && (done || now) && (
+                                <p className="text-xs text-muted">Kitchen estimate: {order.prep_minutes} min</p>
+                            )}
+                            {ev?.note && s !== "pending" && <p className="text-xs text-muted">{ev.note}</p>}
                         </div>
-                        {time && <span className="tabular text-sm text-muted">{clock(time)}</span>}
+                        {ev && <span className="tabular text-sm text-muted">{clock(ev.created_at)}</span>}
                     </li>
                 );
             })}

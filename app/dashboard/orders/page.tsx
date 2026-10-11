@@ -16,6 +16,7 @@ import {
 import { request } from "@/lib/api";
 import { useApi } from "@/lib/hooks";
 import { clock, cn, money, timeAgo } from "@/lib/format";
+import { prepRemaining } from "@/lib/orders";
 import type { Order, OrderStatus, Restaurant } from "@/lib/types";
 import { useToast } from "@/providers/toast-provider";
 import { Badge, EmptyState } from "@/components/ui/Bits";
@@ -23,12 +24,15 @@ import { Button } from "@/components/ui/Button";
 import { Toggle } from "@/components/ui/Field";
 import { Modal } from "@/components/ui/Overlay";
 
-const COLUMNS: { status: OrderStatus; title: string; action: string; next: OrderStatus }[] = [
-    { status: "pending", title: "New", action: "Accept", next: "confirmed" },
-    { status: "confirmed", title: "Accepted", action: "Start cooking", next: "preparing" },
-    { status: "preparing", title: "Cooking", action: "Hand to rider", next: "out_for_delivery" },
-    { status: "out_for_delivery", title: "On the way", action: "Mark delivered", next: "delivered" },
+const COLUMNS: { status: OrderStatus; title: string; action: string; next: OrderStatus; hint: string }[] = [
+    { status: "pending", title: "New", action: "Accept", next: "confirmed", hint: "Accept and set a prep time" },
+    { status: "confirmed", title: "Accepted", action: "Start cooking", next: "preparing", hint: "Queued for the line" },
+    { status: "preparing", title: "Cooking", action: "Mark ready", next: "ready", hint: "On the stove" },
+    { status: "ready", title: "Ready", action: "Hand to rider", next: "out_for_delivery", hint: "Packed, waiting for pickup" },
+    { status: "out_for_delivery", title: "On the way", action: "Mark delivered", next: "delivered", hint: "With the rider" },
 ];
+
+const PREP_CHOICES = [10, 15, 20, 30, 45];
 
 /** A short two-note chime, generated so we don't ship an audio file. */
 function chime() {
@@ -55,6 +59,8 @@ export default function KitchenBoard() {
     const [sound, setSound] = useState(true);
     const [busy, setBusy] = useState<number | null>(null);
     const [rejecting, setRejecting] = useState<Order | null>(null);
+    const [accepting, setAccepting] = useState<Order | null>(null);
+    const [focus, setFocus] = useState<OrderStatus>("pending");
     const [fresh, setFresh] = useState<Set<number>>(new Set());
     const seen = useRef<Set<number> | null>(null);
     const [, tick] = useState(0);
@@ -80,12 +86,17 @@ export default function KitchenBoard() {
         seen.current = new Set(orders.map((o) => o.id));
     }, [orders, sound, toast]);
 
-    const advance = async (order: Order, status: OrderStatus, note = "") => {
+    const advance = async (order: Order, status: OrderStatus, note = "", prepMinutes?: number) => {
         setBusy(order.id);
         mutate((list) => list?.map((o) => (o.id === order.id ? { ...o, status } : o)).filter((o) => status !== "delivered" && status !== "cancelled" ? true : o.id !== order.id), { revalidate: false });
         try {
-            await request(`/orders/${order.id}/`, { method: "PATCH", body: note ? { status, note } : { status } });
-            if (status === "delivered") toast(`Order #${order.id} delivered`);
+            const body: Record<string, unknown> = { status };
+            if (note) body.note = note;
+            if (prepMinutes) body.prep_minutes = prepMinutes;
+            await request(`/orders/${order.id}/`, { method: "PATCH", body });
+            const label = COLUMNS.find((c) => c.next === status)?.action;
+            if (status === "cancelled") toast(`Order #${order.id} rejected. The customer has been told.`, "info");
+            else if (label) toast(`#${order.id}: ${label.toLowerCase()} ✓ · customer notified`);
         } catch (e) {
             toast((e as Error).message, "error");
         } finally {
@@ -133,13 +144,38 @@ export default function KitchenBoard() {
                     <EmptyState icon={<ChefHat size={26} />} title="All quiet" body="New orders will pop up here with a chime. Keep this tab open during service." />
                 </div>
             ) : (
-                <div className="no-scrollbar -mx-4 mt-8 flex snap-x gap-4 overflow-x-auto px-4 pb-4 sm:mx-0 sm:px-0 lg:grid lg:grid-cols-4 lg:overflow-visible">
+                <>
+                <nav aria-label="Jump to stage" className="no-scrollbar sticky top-16 z-20 -mx-4 mt-6 flex gap-2 overflow-x-auto bg-bg/90 px-4 py-2 backdrop-blur xl:hidden">
+                    {COLUMNS.map((col) => {
+                        const n = byStatus(col.status).length;
+                        return (
+                            <button
+                                key={col.status}
+                                onClick={() => {
+                                    setFocus(col.status);
+                                    document.getElementById(`col-${col.status}`)?.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
+                                }}
+                                className={cn(
+                                    "flex shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-semibold",
+                                    focus === col.status ? "border-ink bg-ink text-bg" : "border-line bg-surface",
+                                )}
+                            >
+                                {col.title}
+                                <span className={cn("tabular rounded-full px-1.5 text-xs", n ? "bg-brand text-brand-ink" : "bg-surface-2 text-muted")}>{n}</span>
+                            </button>
+                        );
+                    })}
+                </nav>
+                <div className="no-scrollbar -mx-4 mt-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-4 sm:mx-0 sm:px-0 xl:mt-8 xl:grid xl:grid-cols-5 xl:overflow-visible">
                     {COLUMNS.map((col) => {
                         const list = byStatus(col.status);
                         return (
-                            <section key={col.status} className="w-[85vw] max-w-sm shrink-0 snap-start rounded-3xl bg-surface-2 p-3 sm:w-80 lg:w-auto lg:max-w-none">
+                            <section id={`col-${col.status}`} key={col.status} className="w-[86vw] max-w-sm shrink-0 snap-start scroll-ml-4 rounded-3xl bg-surface-2 p-3 sm:w-80 xl:w-auto xl:max-w-none">
                                 <h2 className="flex items-center justify-between px-2 pt-1 pb-3 font-bold">
-                                    {col.title}
+                                    <span>
+                                        {col.title}
+                                        <span className="block text-xs font-normal text-muted">{col.hint}</span>
+                                    </span>
                                     <span className={cn("tabular grid min-w-7 place-items-center rounded-full px-2 text-sm", list.length ? "bg-ink text-bg" : "bg-surface text-muted")}>{list.length}</span>
                                 </h2>
                                 <div className="space-y-3">
@@ -191,18 +227,31 @@ export default function KitchenBoard() {
                                                     ))}
                                                 </ul>
                                                 {o.notes && <p className="mt-2 rounded-lg bg-warn-soft px-2 py-1 text-xs text-warn">{o.notes}</p>}
+                                                {(() => {
+                                                    const left = prepRemaining(o);
+                                                    if (left === null) return null;
+                                                    return (
+                                                        <p className={cn("mt-2 flex items-center justify-between rounded-lg px-2 py-1 text-xs font-semibold", left < 0 ? "bg-danger-soft text-danger" : "bg-brand-soft text-brand")}>
+                                                            <span>Prep {o.prep_minutes} min</span>
+                                                            <span className="tabular">{left < 0 ? `${-left} min over` : `${left} min left`}</span>
+                                                        </p>
+                                                    );
+                                                })()}
+                                                {o.estimated_delivery_at && o.status !== "pending" && (
+                                                    <p className="mt-1 text-xs text-muted">Customer ETA {clock(o.estimated_delivery_at)}</p>
+                                                )}
                                                 <div className="mt-3 flex items-center justify-between text-sm">
                                                     <span className="tabular font-semibold">{money(o.total_price)}</span>
                                                     <span className="text-xs text-muted">{o.payment_method === "cash" ? "Cash" : "Card"} on delivery</span>
                                                 </div>
                                                 <div className="mt-3 flex gap-2">
-                                                    <Button size="sm" className="flex-1" loading={busy === o.id} onClick={() => advance(o, col.next)}>
+                                                    <Button size="sm" className="flex-1" loading={busy === o.id} onClick={() => (col.status === "pending" ? setAccepting(o) : advance(o, col.next))}>
                                                         {col.action} <ArrowRight size={14} weight="bold" />
                                                     </Button>
                                                     <Link href={`/orders/${o.id}`} aria-label={`Open order ${o.id} and chat`} className="grid size-9 place-items-center rounded-full border border-line hover:border-brand hover:text-brand">
                                                         <ChatCircleDots size={18} />
                                                     </Link>
-                                                    {(o.status === "pending" || o.status === "confirmed") && (
+                                                    {(o.next_statuses ? o.next_statuses.includes("cancelled") : o.status !== "out_for_delivery") && (
                                                         <button onClick={() => setRejecting(o)} aria-label={`Reject order ${o.id}`} className="grid size-9 place-items-center rounded-full border border-line text-muted hover:border-danger hover:text-danger">
                                                             <X size={16} />
                                                         </button>
@@ -217,7 +266,17 @@ export default function KitchenBoard() {
                         );
                     })}
                 </div>
+                </>
             )}
+
+            <AcceptModal
+                order={accepting}
+                onClose={() => setAccepting(null)}
+                onConfirm={(minutes) => {
+                    if (accepting) advance(accepting, "confirmed", "", minutes);
+                    setAccepting(null);
+                }}
+            />
 
             <RejectModal
                 order={rejecting}
@@ -253,6 +312,39 @@ function RejectModal({ order, onClose, onConfirm }: { order: Order | null; onClo
                 <Button variant="danger" onClick={() => onConfirm(reason)}>
                     Reject order
                 </Button>
+            </div>
+        </Modal>
+    );
+}
+
+function AcceptModal({ order, onClose, onConfirm }: { order: Order | null; onClose: () => void; onConfirm: (minutes: number) => void }) {
+    const fallback = order?.restaurant_details?.prep_time_minutes ?? 20;
+    const [minutes, setMinutes] = useState<number>(20);
+    useEffect(() => {
+        if (order) setMinutes(PREP_CHOICES.reduce((best, m) => (Math.abs(m - fallback) < Math.abs(best - fallback) ? m : best), 20));
+    }, [order, fallback]);
+    return (
+        <Modal open={!!order} onClose={onClose} title={`Accept order #${order?.id}`}>
+            <p className="text-sm text-muted">How long until it&apos;s packed? The customer&apos;s ETA updates from this.</p>
+            <div className="mt-4 grid grid-cols-5 gap-2" role="radiogroup" aria-label="Prep time">
+                {PREP_CHOICES.map((m) => (
+                    <button
+                        key={m}
+                        role="radio"
+                        aria-checked={minutes === m}
+                        onClick={() => setMinutes(m)}
+                        className={cn("rounded-2xl border py-3 text-center font-bold", minutes === m ? "border-brand bg-brand-soft text-brand" : "border-line")}
+                    >
+                        <span className="tabular block text-lg">{m}</span>
+                        <span className="block text-xs font-medium text-muted">min</span>
+                    </button>
+                ))}
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+                <Button variant="outline" onClick={onClose}>
+                    Not yet
+                </Button>
+                <Button onClick={() => onConfirm(minutes)}>Accept · {minutes} min</Button>
             </div>
         </Modal>
     );

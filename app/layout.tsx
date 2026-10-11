@@ -10,6 +10,7 @@ import MobileTabBar from "@/components/shell/MobileTabBar";
 import CartDrawer from "@/components/cart/CartDrawer";
 import SlowNetworkBanner from "@/components/shell/SlowNetworkBanner";
 import Footer from "@/components/shell/Footer";
+import { OrderWatcher } from "@/components/orders/OrderWatcher";
 
 const display = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-display", weight: ["500", "600", "700", "800"] });
 const body = Figtree({ subsets: ["latin"], variable: "--font-body" });
@@ -46,6 +47,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                                     {children}
                                 </main>
                                 <Footer />
+                                <OrderWatcher />
                                 <MobileTabBar />
                                 <CartDrawer />
                             </CartProvider>

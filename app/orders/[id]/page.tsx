@@ -17,7 +17,7 @@ import {
 } from "@phosphor-icons/react";
 import { useApi } from "@/lib/hooks";
 import { request } from "@/lib/api";
-import { STATUS_COPY, isActive, orderProgress } from "@/lib/orders";
+import { STATUS_COPY, etaDisplay, isActive, orderProgress } from "@/lib/orders";
 import { clock, cn, dateTime, money, num } from "@/lib/format";
 import type { Order } from "@/lib/types";
 import { useReorder } from "@/lib/useReorder";
@@ -51,14 +51,30 @@ function OrderDetail() {
     const [cancelOpen, setCancelOpen] = useState(false);
     const [cancelling, setCancelling] = useState(false);
 
-    const { data: order, error, mutate } = useApi<Order>(user ? `/orders/${id}/` : null, {
-        refreshInterval: (o) => (o && isActive(o.status) ? 8000 : 0),
+    // No websockets on Vercel: poll faster while the rider is moving, pause once the order is finished.
+    const { data: order, error, mutate, isValidating } = useApi<Order>(user ? `/orders/${id}/` : null, {
+        refreshInterval: (o) => (!o || !isActive(o.status) ? 0 : o.status === "out_for_delivery" ? 5000 : 8000),
+        revalidateOnFocus: true,
     });
+    const [syncedAt, setSyncedAt] = useState(() => Date.now());
 
     useEffect(() => {
-        const t = setInterval(() => setNow(Date.now()), 15000);
+        if (order) setSyncedAt(Date.now());
+    }, [order]);
+
+    useEffect(() => {
+        const t = setInterval(() => setNow(Date.now()), 5000);
         return () => clearInterval(t);
     }, []);
+
+    useEffect(() => {
+        if (!order) return;
+        const prev = document.title;
+        document.title = `${STATUS_COPY[order.status].short} · Order #${order.id} | QuickFood`;
+        return () => {
+            document.title = prev;
+        };
+    }, [order]);
 
     if (error) {
         return (
@@ -72,8 +88,8 @@ function OrderDetail() {
     const active = isActive(order.status);
     const copy = STATUS_COPY[order.status];
     const progress = orderProgress(order, now);
-    const eta = order.estimated_delivery_at ? new Date(order.estimated_delivery_at).getTime() : null;
-    const minsLeft = eta ? Math.round((eta - now) / 60000) : null;
+    const eta = etaDisplay(order, now);
+    const secondsAgo = Math.max(0, Math.round((now - syncedAt) / 1000));
     const chatOpen = active || (order.delivered_at ? now - new Date(order.delivered_at).getTime() < 2 * 3600 * 1000 : false);
     const r = order.restaurant_details;
 
@@ -118,12 +134,10 @@ function OrderDetail() {
                                     <p className="mt-1 text-muted">{copy.body}</p>
                                 </div>
                                 {active && eta && (
-                                    <div className="rounded-2xl bg-brand-soft px-4 py-3 text-right">
-                                        <p className="text-xs font-semibold text-brand">{order.scheduled_for ? "Scheduled for" : "Arriving"}</p>
-                                        <p className="tabular font-display text-2xl font-extrabold text-brand">
-                                            {order.scheduled_for ? clock(order.scheduled_for) : minsLeft !== null && minsLeft > 1 ? `${minsLeft} min` : "Any minute"}
-                                        </p>
-                                        {!order.scheduled_for && <p className="tabular text-xs text-muted">by {clock(eta)}</p>}
+                                    <div className={cn("rounded-2xl px-4 py-3 text-right", eta.late ? "bg-warn-soft" : "bg-brand-soft")}>
+                                        <p className={cn("text-xs font-semibold", eta.late ? "text-warn" : "text-brand")}>{order.status === "out_for_delivery" ? "Arriving in" : "Arriving"}</p>
+                                        <p className={cn("tabular font-display text-2xl font-extrabold", eta.late ? "text-warn" : "text-brand")}>{eta.big}</p>
+                                        <p className="tabular text-xs text-muted">{eta.small}</p>
                                     </div>
                                 )}
                                 {order.status === "delivered" && order.delivered_at && (
@@ -136,7 +150,21 @@ function OrderDetail() {
                                 </p>
                             )}
                             {active && (
-                                <div className="mt-5 h-2 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-valuenow={Math.round(progress * 100)} aria-valuemin={0} aria-valuemax={100}>
+                                <p className="mt-4 inline-flex items-center gap-2 text-xs text-muted" aria-live="polite">
+                                    <span className={cn("size-2 rounded-full", isValidating ? "animate-pulse bg-warn" : "bg-ok")} aria-hidden />
+                                    Live · updated {secondsAgo < 10 ? "just now" : `${secondsAgo}s ago`}
+                                    <button onClick={() => mutate()} className="font-semibold text-brand hover:underline">
+                                        Refresh
+                                    </button>
+                                </p>
+                            )}
+                            {active && eta?.late && (
+                                <p className="mt-3 rounded-2xl bg-warn-soft px-4 py-3 text-sm text-warn">
+                                    Running a bit behind the estimate. The kitchen can see this too. Use the chat below if you need an update.
+                                </p>
+                            )}
+                            {active && (
+                                <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-valuenow={Math.round(progress * 100)} aria-valuemin={0} aria-valuemax={100}>
                                     <div className="h-full rounded-full bg-brand transition-all duration-1000" style={{ width: `${Math.max(4, progress * 100)}%` }} />
                                 </div>
                             )}

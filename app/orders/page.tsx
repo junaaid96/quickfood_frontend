@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowClockwise, ArrowRight, Receipt, Star } from "@phosphor-icons/react";
 import { useApi } from "@/lib/hooks";
-import { STATUS_COPY, isActive, orderProgress } from "@/lib/orders";
+import { STATUS_COPY, etaDisplay, isActive, orderProgress } from "@/lib/orders";
 import { clock, dateTime, money } from "@/lib/format";
 import type { Order } from "@/lib/types";
 import { useReorder } from "@/lib/useReorder";
@@ -18,7 +18,7 @@ export default function OrdersPage() {
     const { user, isLoading, isRestaurantOwner } = useAuth();
     const router = useRouter();
     const [tab, setTab] = useState<"all" | "delivered" | "cancelled">("all");
-    const { data: orders } = useApi<Order[]>(user ? "/orders/" : null, { refreshInterval: 15000 });
+    const { data: orders } = useApi<Order[]>(user ? "/orders/" : null, { refreshInterval: 10000, revalidateOnFocus: true });
     const { reorder, busy } = useReorder();
 
     useEffect(() => {
@@ -58,8 +58,17 @@ export default function OrdersPage() {
                                                 <p className="text-sm text-brand">{STATUS_COPY[o.status].title}</p>
                                             </div>
                                             <div className="text-right">
-                                                {o.estimated_delivery_at && <p className="tabular font-bold">{clock(o.estimated_delivery_at)}</p>}
-                                                <p className="text-xs text-muted">{o.scheduled_for ? "scheduled" : "estimated"}</p>
+                                                {(() => {
+                                                    const eta = etaDisplay(o);
+                                                    return eta ? (
+                                                        <>
+                                                            <p className="tabular font-bold">{eta.big}</p>
+                                                            <p className="text-xs text-muted">{eta.small}</p>
+                                                        </>
+                                                    ) : o.estimated_delivery_at ? (
+                                                        <p className="tabular font-bold">{clock(o.estimated_delivery_at)}</p>
+                                                    ) : null;
+                                                })()}
                                             </div>
                                             <ArrowRight size={18} className="text-muted" />
                                         </div>
@@ -100,7 +109,7 @@ export default function OrdersPage() {
                                     </Link>
                                     <div className="flex items-center gap-2">
                                         {o.status === "cancelled" ? (
-                                            <Badge tone="danger">Cancelled</Badge>
+                                            <Badge tone="danger">{o.cancelled_by === "restaurant" ? "Declined by restaurant" : "Cancelled"}</Badge>
                                         ) : o.review ? (
                                             <Badge tone="warn">
                                                 <Star size={12} weight="fill" /> {o.review.rating}
