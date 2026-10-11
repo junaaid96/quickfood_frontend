@@ -3,7 +3,7 @@
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { useEffect, useMemo, useState } from "react";
-import { MapContainer, Marker, Polyline, TileLayer, useMap } from "react-leaflet";
+import { MapContainer, Marker, Polyline, TileLayer, ZoomControl, useMap } from "react-leaflet";
 import type { Order } from "@/lib/types";
 import type { RiderLocation } from "@/lib/realtime";
 import { customerPoint, metersLeft, pointAlong, restaurantPoint, routeFor, simulatedFraction, type LatLng } from "@/lib/geo";
@@ -80,10 +80,11 @@ export default function LiveMap({ order, live, onEta }: { order: Order; live: Ri
 
     return (
         <div className="relative overflow-hidden rounded-3xl border border-line">
-            <MapContainer center={at} zoom={14} scrollWheelZoom={false} className="h-72 w-full sm:h-80" attributionControl>
+            <MapContainer center={at} zoom={14} scrollWheelZoom={false} zoomControl={false} className="h-72 w-full sm:h-80" attributionControl>
                 <TileLayer
-                    url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
+                    url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    maxZoom={19}
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                 />
                 <FitOnce points={[restaurantPoint(order.restaurant), customerPoint(order)]} />
                 <Polyline positions={route} pathOptions={{ color: "#c2410c", weight: 5, opacity: 0.25, dashArray: moving ? undefined : "6 8" }} />
@@ -92,6 +93,7 @@ export default function LiveMap({ order, live, onEta }: { order: Order; live: Ri
                 <Marker position={route[route.length - 1]} icon={ICONS.home} title="You" />
                 {order.status !== "cancelled" && <Marker position={at} icon={riderIcon(heading - 90, !!fresh)} title="Rider" zIndexOffset={1000} />}
                 <Follow at={at} enabled={moving} />
+                <ZoomControl position="bottomright" />
             </MapContainer>
             <div className="pointer-events-none absolute top-3 left-3 z-[500] flex flex-wrap gap-2">
                 <span
