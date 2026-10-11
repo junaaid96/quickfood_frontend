@@ -17,6 +17,9 @@ import { request } from "@/lib/api";
 import { useApi } from "@/lib/hooks";
 import { clock, cn, money, timeAgo } from "@/lib/format";
 import { prepRemaining } from "@/lib/orders";
+import { useRealtimeState, useUserPushes } from "@/lib/realtime";
+import { useAuth } from "@/providers/auth-provider";
+import { RiderBeacon } from "@/components/orders/RiderBeacon";
 import type { Order, OrderStatus, Restaurant } from "@/lib/types";
 import { useToast } from "@/providers/toast-provider";
 import { Badge, EmptyState } from "@/components/ui/Bits";
@@ -54,7 +57,11 @@ function chime() {
 
 export default function KitchenBoard() {
     const toast = useToast();
-    const { data: orders, mutate } = useApi<Order[]>("/orders/?status=active", { refreshInterval: 5000, revalidateOnFocus: true });
+    const { user } = useAuth();
+    const realtime = useRealtimeState();
+    // New orders and status changes arrive over Ably; polling remains as the fallback.
+    const { data: orders, mutate } = useApi<Order[]>("/orders/?status=active", { refreshInterval: realtime ? 20000 : 5000, revalidateOnFocus: true });
+    useUserPushes(user?.id, () => mutate());
     const { data: restaurants, mutate: mutateRestaurants } = useApi<Restaurant[]>("/restaurants/restaurant/?owner=me");
     const [sound, setSound] = useState(true);
     const [busy, setBusy] = useState<number | null>(null);
@@ -125,7 +132,7 @@ export default function KitchenBoard() {
                     <h1 className="flex items-center gap-3 text-3xl font-extrabold sm:text-4xl">
                         <ChefHat size={36} weight="duotone" className="text-brand" /> Kitchen board
                     </h1>
-                    <p className="mt-1 text-muted">Live. Updates every few seconds. Oldest tickets first.</p>
+                    <p className="mt-1 text-muted">{realtime ? "Realtime: new orders appear instantly." : "Live. Updates every few seconds."} Oldest tickets first.</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                     {restaurants?.map((r) => (
@@ -237,6 +244,7 @@ export default function KitchenBoard() {
                                                         </p>
                                                     );
                                                 })()}
+                                                {o.status === "out_for_delivery" && <RiderBeacon order={o} />}
                                                 {o.estimated_delivery_at && o.status !== "pending" && (
                                                     <p className="mt-1 text-xs text-muted">Customer ETA {clock(o.estimated_delivery_at)}</p>
                                                 )}

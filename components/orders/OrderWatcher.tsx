@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { ArrowRight, BellRinging, X } from "@phosphor-icons/react";
 import { request } from "@/lib/api";
 import { useApi } from "@/lib/hooks";
+import { useRealtimeState, useUserPushes } from "@/lib/realtime";
 import { STATUS_COPY, STATUS_NOTICE, etaDisplay, isActive, orderProgress } from "@/lib/orders";
 import type { Order, OrderStatus } from "@/lib/types";
 import { useAuth } from "@/providers/auth-provider";
@@ -49,10 +50,12 @@ export function OrderWatcher() {
     const [visible, setVisible] = useState(true);
     const [hidden, setHidden] = useState(false);
     const [canAsk, setCanAsk] = useState(false);
-    const { data: orders } = useApi<Order[]>(enabled ? "/orders/?status=active" : null, {
-        refreshInterval: visible ? 12000 : 45000,
+    const realtime = useRealtimeState();
+    const { data: orders, mutate } = useApi<Order[]>(enabled ? "/orders/?status=active" : null, {
+        refreshInterval: realtime ? 30000 : visible ? 12000 : 45000,
         revalidateOnFocus: true,
     });
+    useUserPushes(enabled ? user?.id : undefined, () => mutate());
     const known = useRef<Record<number, OrderStatus> | null>(null);
 
     useEffect(() => {
