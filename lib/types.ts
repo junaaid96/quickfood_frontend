@@ -1,4 +1,4 @@
-export type Role = "user" | "restaurant_owner";
+export type Role = "user" | "restaurant_owner" | "rider";
 
 export interface User {
     id: number;
@@ -152,7 +152,11 @@ export interface Order {
     cancelled_by?: "customer" | "restaurant" | "";
     eta_minutes?: number | null;
     /** Moves the restaurant may make next (empty for customers). */
-    next_statuses?: OrderStatus[];
+    next_statuses?: (OrderStatus | "claim")[];
+    rider?: number | null;
+    rider_details?: RiderSummary | null;
+    rider_rating?: number | null;
+    rider_assigned_at?: string | null;
     items: OrderItem[];
     events: OrderEvent[];
     review: { id: number; rating: number; comment: string; owner_reply: string } | null;
@@ -253,4 +257,39 @@ export interface Paginated<T> {
     next: string | null;
     previous: string | null;
     results: T[];
+}
+
+export interface RiderSummary {
+    id: number;
+    name: string;
+    phone_number: string;
+    vehicle: string;
+    vehicle_plate: string;
+    photo: string | null;
+    rating: number | null;
+}
+
+export type Vehicle = "motorbike" | "bicycle" | "scooter" | "car" | "on_foot";
+
+export interface RiderProfile {
+    id: number;
+    name: string;
+    first_name: string;
+    last_name: string;
+    phone_number: string | null;
+    vehicle: Vehicle;
+    vehicle_label: string;
+    vehicle_plate: string;
+    photo_display: string | null;
+    is_available: boolean;
+    stats: {
+        deliveries: number;
+        earnings: number;
+        tips: number;
+        rating: number | null;
+        rating_count: number;
+        today_deliveries: number;
+        today_earnings: number;
+        active: number;
+    };
 }

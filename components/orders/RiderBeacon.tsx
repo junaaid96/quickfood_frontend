@@ -11,8 +11,8 @@ import { cn } from "@/lib/format";
  * Restaurant / rider side of live tracking. Publishes the rider's position to the order's Ably channel:
  * real browser GPS when the person delivering turns it on, otherwise the demo route driven by the ETA.
  */
-export function RiderBeacon({ order }: { order: Order }) {
-    const [gps, setGps] = useState(false);
+export function RiderBeacon({ order, preferGps = false }: { order: Order; preferGps?: boolean }) {
+    const [gps, setGps] = useState(preferGps);
     const [ok, setOk] = useState<boolean | null>(null);
     const [error, setError] = useState("");
     const ref = useRef(order);

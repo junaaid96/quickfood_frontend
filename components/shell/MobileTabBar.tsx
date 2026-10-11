@@ -2,16 +2,21 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChartLine, ChefHat, Compass, House, Receipt, Storefront, User, Wallet } from "@phosphor-icons/react";
+import { Moped, ChartLine, ChefHat, Compass, House, Receipt, Storefront, User, Wallet } from "@phosphor-icons/react";
 import { useAuth } from "@/providers/auth-provider";
 import { cn } from "@/lib/format";
 
 export default function MobileTabBar() {
-    const { isRestaurantOwner, isAuthenticated } = useAuth();
+    const { isRestaurantOwner, isRider, isAuthenticated } = useAuth();
     const pathname = usePathname();
     if (pathname === "/login" || pathname === "/register") return null;
 
-    const tabs = isRestaurantOwner
+    const tabs = isRider
+        ? [
+              { href: "/rider", label: "Deliveries", icon: Moped },
+              { href: "/rider/profile", label: "Profile", icon: User },
+          ]
+        : isRestaurantOwner
         ? [
               { href: "/dashboard", label: "Overview", icon: ChartLine },
               { href: "/dashboard/orders", label: "Kitchen", icon: ChefHat },
@@ -26,7 +31,7 @@ export default function MobileTabBar() {
               { href: isAuthenticated ? "/profile" : "/login", label: "Account", icon: User },
           ];
 
-    const active = (href: string) => (href === "/" || href === "/dashboard" ? pathname === href : pathname.startsWith(href.split("?")[0]));
+    const active = (href: string) => (href === "/" || href === "/dashboard" || href === "/rider" ? pathname === href : pathname.startsWith(href.split("?")[0]));
 
     return (
         <nav

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ForkKnife, Storefront } from "@phosphor-icons/react";
+import { ForkKnife, Moped, Storefront } from "@phosphor-icons/react";
 import { useAuth, type RegisterInput } from "@/providers/auth-provider";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/format";
@@ -31,7 +31,7 @@ function strength(pw: string) {
 function RegisterForm() {
     const { register, login } = useAuth();
     const params = useSearchParams();
-    const [role, setRole] = useState<Role>(params.get("role") === "restaurant_owner" ? "restaurant_owner" : "user");
+    const [role, setRole] = useState<Role>(params.get("role") === "restaurant_owner" ? "restaurant_owner" : params.get("role") === "rider" ? "rider" : "user");
     const [form, setForm] = useState({ first_name: "", last_name: "", username: "", email: "", phone_number: "", password: "" });
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [error, setError] = useState("");
@@ -47,7 +47,7 @@ function RegisterForm() {
         try {
             const payload: RegisterInput = { ...form, role };
             await register(payload);
-            await login(form.username, form.password, role === "restaurant_owner" ? "/dashboard/restaurants/new" : params.get("redirect"));
+            await login(form.username, form.password, role === "restaurant_owner" ? "/dashboard/restaurants/new" : role === "rider" ? "/rider/profile?welcome=1" : params.get("redirect"));
         } catch (err) {
             if (err instanceof ApiError && Object.keys(err.fieldErrors).length) setErrors(err.fieldErrors);
             else setError((err as Error).message);
@@ -60,10 +60,11 @@ function RegisterForm() {
             <h1 className="text-4xl font-extrabold">Create your account</h1>
             <p className="mt-2 text-muted">It takes less than a minute.</p>
 
-            <div className="mt-8 grid grid-cols-2 gap-3" role="radiogroup" aria-label="Account type">
+            <div className="mt-8 grid grid-cols-3 gap-3" role="radiogroup" aria-label="Account type">
                 {[
                     { value: "user" as Role, label: "I want to order", icon: ForkKnife },
                     { value: "restaurant_owner" as Role, label: "I run a restaurant", icon: Storefront },
+                    { value: "rider" as Role, label: "I deliver", icon: Moped },
                 ].map(({ value, label, icon: Icon }) => (
                     <button
                         key={value}
@@ -115,7 +116,7 @@ function RegisterForm() {
                 </Field>
                 {error && <p role="alert" className="rounded-xl bg-danger-soft px-4 py-3 text-sm text-danger">{error}</p>}
                 <Button type="submit" size="lg" loading={loading} className="w-full">
-                    {role === "restaurant_owner" ? "Create partner account" : "Create account"}
+                    {role === "restaurant_owner" ? "Create partner account" : role === "rider" ? "Create rider account" : "Create account"}
                 </Button>
             </form>
             <p className="mt-8 text-center text-muted">

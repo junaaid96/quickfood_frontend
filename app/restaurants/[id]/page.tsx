@@ -44,7 +44,7 @@ const DIET_FILTERS = [
 export default function RestaurantPage() {
     const { id } = useParams<{ id: string }>();
     const router = useRouter();
-    const { user, isRestaurantOwner } = useAuth();
+    const { user, isStaff } = useAuth();
     const cart = useCart();
     const toast = useToast();
     const { data: r, error, isLoading } = useApi<RestaurantDetail>(`/restaurants/restaurant/${id}/`);
@@ -98,7 +98,7 @@ export default function RestaurantPage() {
 
     const isOwner = user?.id === r.owner.id;
     const inThisCart = cart.restaurant?.id === r.id;
-    const canOrder = !isRestaurantOwner && r.is_accepting_orders;
+    const canOrder = !isStaff && r.is_accepting_orders;
     const hours = hoursLabel(r.opens_at, r.closes_at);
     const cartRestaurant = toCartRestaurant(r);
     const add = (itemId: number) => {
@@ -263,7 +263,7 @@ export default function RestaurantPage() {
                                 </>
                             ) : (
                                 <p className="mt-3 text-sm text-muted">
-                                    {isRestaurantOwner ? "Partner accounts can't place orders." : "Add dishes and they'll show up here."}
+                                    {isStaff ? "Partner accounts can't place orders." : "Add dishes and they'll show up here."}
                                 </p>
                             )}
                         </div>
