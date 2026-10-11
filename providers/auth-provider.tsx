@@ -1,5 +1,7 @@
 "use client";
 
+import { closeRealtime } from "@/lib/realtime";
+
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { mutate } from "swr";
@@ -73,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     const logout = () => {
+        closeRealtime();
         tokens.clear();
         setUser(null);
         mutate(() => true, undefined, { revalidate: false });

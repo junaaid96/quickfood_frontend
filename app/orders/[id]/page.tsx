@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import {
     ArrowClockwise,
@@ -29,7 +29,13 @@ import { Textarea } from "@/components/ui/Field";
 import { CoverImage } from "@/components/ui/CoverImage";
 import { Modal } from "@/components/ui/Overlay";
 import { StatusTimeline } from "@/components/orders/StatusTimeline";
-import { RouteMap } from "@/components/orders/RouteMap";
+import dynamic from "next/dynamic";
+import { useOrderChannel, useRealtimeState, type RiderLocation } from "@/lib/realtime";
+
+const LiveMap = dynamic(() => import("@/components/orders/LiveMap"), {
+    ssr: false,
+    loading: () => <div className="skeleton h-72 rounded-3xl sm:h-80" />,
+});
 import { OrderChat } from "@/components/orders/OrderChat";
 import { SplitBill } from "@/components/orders/SplitBill";
 
@@ -52,9 +58,18 @@ function OrderDetail() {
     const [cancelling, setCancelling] = useState(false);
 
     // No websockets on Vercel: poll faster while the rider is moving, pause once the order is finished.
+    // Ably pushes status changes and the rider's position; polling stays on as a slower fallback.
+    const realtime = useRealtimeState();
     const { data: order, error, mutate, isValidating } = useApi<Order>(user ? `/orders/${id}/` : null, {
-        refreshInterval: (o) => (!o || !isActive(o.status) ? 0 : o.status === "out_for_delivery" ? 5000 : 8000),
+        refreshInterval: (o) => (!o || !isActive(o.status) ? 0 : realtime ? 20000 : o.status === "out_for_delivery" ? 5000 : 8000),
         revalidateOnFocus: true,
+    });
+    const [live, setLive] = useState<RiderLocation | null>(null);
+    const [mapEta, setMapEta] = useState<{ minutes: number | null; source: string }>({ minutes: null, source: "estimate" });
+    const onEta = useCallback((minutes: number | null, source: string) => setMapEta({ minutes, source }), []);
+    useOrderChannel(user && order && isActive(order.status) ? order.id : undefined, {
+        onStatus: () => mutate(),
+        onLocation: setLive,
     });
     const [syncedAt, setSyncedAt] = useState(() => Date.now());
 
@@ -88,7 +103,11 @@ function OrderDetail() {
     const active = isActive(order.status);
     const copy = STATUS_COPY[order.status];
     const progress = orderProgress(order, now);
-    const eta = etaDisplay(order, now);
+    const baseEta = etaDisplay(order, now);
+    const eta =
+        baseEta && order.status === "out_for_delivery" && mapEta.minutes !== null && mapEta.source !== "estimate"
+            ? { ...baseEta, big: mapEta.minutes > 1 ? `${mapEta.minutes} min` : "Any minute", small: "live from the rider", late: false }
+            : baseEta;
     const secondsAgo = Math.max(0, Math.round((now - syncedAt) / 1000));
     const chatOpen = active || (order.delivered_at ? now - new Date(order.delivered_at).getTime() < 2 * 3600 * 1000 : false);
     const r = order.restaurant_details;
@@ -151,8 +170,8 @@ function OrderDetail() {
                             )}
                             {active && (
                                 <p className="mt-4 inline-flex items-center gap-2 text-xs text-muted" aria-live="polite">
-                                    <span className={cn("size-2 rounded-full", isValidating ? "animate-pulse bg-warn" : "bg-ok")} aria-hidden />
-                                    Live · updated {secondsAgo < 10 ? "just now" : `${secondsAgo}s ago`}
+                                    <span className={cn("size-2 rounded-full", isValidating ? "animate-pulse bg-warn" : realtime ? "animate-pulse bg-ok" : "bg-ok")} aria-hidden />
+                                    {realtime ? "Live updates on" : "Live"} · synced {secondsAgo < 10 ? "just now" : `${secondsAgo}s ago`}
                                     <button onClick={() => mutate()} className="font-semibold text-brand hover:underline">
                                         Refresh
                                     </button>
@@ -171,7 +190,7 @@ function OrderDetail() {
                         </div>
                         {order.status !== "cancelled" && (
                             <div className="border-t border-line p-3 sm:p-4">
-                                <RouteMap progress={progress} active={active} />
+                                <LiveMap order={order} live={live} onEta={onEta} />
                             </div>
                         )}
                     </Card>
