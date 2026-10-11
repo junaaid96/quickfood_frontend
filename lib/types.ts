@@ -101,7 +101,7 @@ export interface Review {
     created_at: string;
 }
 
-export type OrderStatus = "pending" | "confirmed" | "preparing" | "out_for_delivery" | "delivered" | "cancelled";
+export type OrderStatus = "pending" | "confirmed" | "preparing" | "ready" | "out_for_delivery" | "delivered" | "cancelled";
 export type DeliveryOption = "priority" | "standard" | "eco";
 
 export interface OrderItem {
@@ -147,6 +147,12 @@ export interface Order {
     scheduled_for: string | null;
     estimated_delivery_at: string | null;
     delivered_at: string | null;
+    /** Kitchen's prep estimate in minutes, set when the restaurant accepts. */
+    prep_minutes?: number | null;
+    cancelled_by?: "customer" | "restaurant" | "";
+    eta_minutes?: number | null;
+    /** Moves the restaurant may make next (empty for customers). */
+    next_statuses?: OrderStatus[];
     items: OrderItem[];
     events: OrderEvent[];
     review: { id: number; rating: number; comment: string; owner_reply: string } | null;
