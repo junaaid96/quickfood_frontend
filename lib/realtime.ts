@@ -125,3 +125,19 @@ export async function publishLocation(orderId: number, loc: RiderLocation) {
         }
     }
 }
+
+/** Riders: hear about orders waiting for pickup (and ones another rider just took). */
+export function useRidersFeed(enabled: boolean, onChange: (p: StatusPush & { event?: string }) => void) {
+    const cb = useRef(onChange);
+    cb.current = onChange;
+    useEffect(() => {
+        const rt = enabled ? getRealtime() : null;
+        if (!rt) return;
+        const ch = rt.channels.get("riders");
+        const fn = (m: Ably.InboundMessage) => cb.current({ ...(m.data as StatusPush), event: m.name });
+        ch.subscribe(fn).catch(() => {});
+        return () => {
+            ch.unsubscribe(fn);
+        };
+    }, [enabled]);
+}

@@ -50,7 +50,7 @@ export default function OrderPage() {
 function OrderDetail() {
     const { id } = useParams<{ id: string }>();
     const placed = useSearchParams().get("placed") === "1";
-    const { user, isRestaurantOwner } = useAuth();
+    const { user, isRestaurantOwner, isRider } = useAuth();
     const toast = useToast();
     const { reorder, busy } = useReorder();
     const [now, setNow] = useState(() => Date.now());
@@ -128,8 +128,8 @@ function OrderDetail() {
 
     return (
         <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
-            <Link href={isRestaurantOwner ? "/dashboard/orders" : "/orders"} className="inline-flex items-center gap-1.5 text-sm font-medium text-muted hover:text-ink">
-                <ArrowLeft size={16} /> {isRestaurantOwner ? "Kitchen board" : "All orders"}
+            <Link href={isRestaurantOwner ? "/dashboard/orders" : isRider ? "/rider" : "/orders"} className="inline-flex items-center gap-1.5 text-sm font-medium text-muted hover:text-ink">
+                <ArrowLeft size={16} /> {isRestaurantOwner ? "Kitchen board" : isRider ? "My deliveries" : "All orders"}
             </Link>
 
             {placed && active && (
@@ -194,6 +194,11 @@ function OrderDetail() {
                             </div>
                         )}
                     </Card>
+
+                    {order.rider_details && order.status !== "cancelled" && <RiderCard order={order} canRate={!isRestaurantOwner && !isRider} onRated={() => mutate()} />}
+                    {!order.rider_details && active && ["ready", "preparing", "confirmed"].includes(order.status) && (
+                        <p className="rounded-2xl border border-dashed border-line px-4 py-3 text-sm text-muted">Finding a rider nearby… you&apos;ll see their name and live location here.</p>
+                    )}
 
                     <div className="grid gap-6 md:grid-cols-2">
                         <Card>
@@ -376,5 +381,57 @@ function OrderSkeleton() {
             <Skeleton className="h-[520px] rounded-3xl" />
             <Skeleton className="h-[420px] rounded-3xl" />
         </div>
+    );
+}
+
+function RiderCard({ order, canRate, onRated }: { order: Order; canRate: boolean; onRated: () => void }) {
+    const r = order.rider_details!;
+    const toast = useToast();
+    const [rating, setRating] = useState(order.rider_rating ?? 0);
+    const rate = async (v: number) => {
+        setRating(v);
+        try {
+            await request(`/orders/${order.id}/rate_rider/`, { method: "POST", body: { rating: v } });
+            toast(`Thanks! You rated ${r.name.split(" ")[0]} ${v}★`);
+            onRated();
+        } catch (e) {
+            toast((e as Error).message, "error");
+        }
+    };
+    return (
+        <Card className="flex flex-wrap items-center gap-4">
+            {r.photo ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={r.photo} alt="" className="size-14 rounded-full object-cover ring-2 ring-brand/30" />
+            ) : (
+                <span className="grid size-14 place-items-center rounded-full bg-brand-soft text-2xl">🛵</span>
+            )}
+            <div className="min-w-0 flex-1">
+                <p className="text-xs font-semibold text-muted">{order.status === "delivered" ? "Delivered by" : order.status === "out_for_delivery" ? "Your rider is on the way" : "Your rider"}</p>
+                <p className="truncate text-lg font-bold">{r.name}</p>
+                <p className="truncate text-sm text-muted">
+                    {r.vehicle}
+                    {r.vehicle_plate && ` · ${r.vehicle_plate}`}
+                    {r.rating && (
+                        <>
+                            {" "}
+                            · <Star size={12} weight="fill" className="inline text-warn" /> {r.rating}
+                        </>
+                    )}
+                </p>
+            </div>
+            {order.status === "delivered" && canRate ? (
+                <div className="w-full sm:w-auto">
+                    <p className="mb-1 text-xs font-semibold text-muted">{order.rider_rating ? "Your rating" : "Rate your rider"}</p>
+                    <StarInput value={rating} onChange={rate} />
+                </div>
+            ) : (
+                r.phone_number && isActive(order.status) && (
+                    <a href={`tel:${r.phone_number}`} aria-label={`Call ${r.name}`} className="grid size-11 place-items-center rounded-full bg-brand text-brand-ink hover:opacity-90">
+                        <Phone size={18} weight="fill" />
+                    </a>
+                )
+            )}
+        </Card>
     );
 }

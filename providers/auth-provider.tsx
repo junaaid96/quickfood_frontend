@@ -23,6 +23,9 @@ type AuthContextType = {
     isLoading: boolean;
     isAuthenticated: boolean;
     isRestaurantOwner: boolean;
+    isRider: boolean;
+    /** Restaurant owners and riders: accounts that can't place orders. */
+    isStaff: boolean;
     login: (username: string, password: string, redirectTo?: string | null) => Promise<User>;
     register: (data: RegisterInput) => Promise<void>;
     logout: () => void;
@@ -65,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(profile);
         // Clear any data cached for an anonymous visitor (favourites, etc).
         mutate(() => true, undefined, { revalidate: true });
-        const fallback = profile.role === "restaurant_owner" ? "/dashboard" : "/restaurants";
+        const fallback = profile.role === "restaurant_owner" ? "/dashboard" : profile.role === "rider" ? "/rider" : "/restaurants";
         router.push(redirectTo && redirectTo.startsWith("/") ? redirectTo : fallback);
         return profile;
     };
@@ -89,6 +92,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 isLoading,
                 isAuthenticated: !!user,
                 isRestaurantOwner: user?.role === "restaurant_owner",
+                isRider: user?.role === "rider",
+                isStaff: user?.role === "restaurant_owner" || user?.role === "rider",
                 login,
                 register,
                 logout,

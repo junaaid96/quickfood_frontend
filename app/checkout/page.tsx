@@ -46,7 +46,7 @@ export default function CheckoutPage() {
     const router = useRouter();
     const toast = useToast();
     const cart = useCart();
-    const { user, isLoading: authLoading, isRestaurantOwner, refreshUser } = useAuth();
+    const { user, isLoading: authLoading, isStaff, refreshUser } = useAuth();
 
     const { data: addresses, mutate: mutateAddresses } = useApi<Address[]>(user ? "/accounts/addresses/" : null);
     const { data: promos } = useApi<Promo[]>(cart.restaurant ? `/orders/promos/?restaurant=${cart.restaurant.id}` : null);
@@ -95,7 +95,7 @@ export default function CheckoutPage() {
 
     // Live quote from the server, debounced.
     useEffect(() => {
-        if (!user || !orderItems.length || isRestaurantOwner) return;
+        if (!user || !orderItems.length || isStaff) return;
         const t = setTimeout(async () => {
             try {
                 const q = await request<Quote>("/orders/quote/", {
@@ -109,10 +109,10 @@ export default function CheckoutPage() {
             }
         }, 250);
         return () => clearTimeout(t);
-    }, [user, orderItems, speed, promo, usePoints, tip, scheduledFor, isRestaurantOwner]);
+    }, [user, orderItems, speed, promo, usePoints, tip, scheduledFor, isStaff]);
 
     if (authLoading || !user) return <CheckoutSkeleton />;
-    if (isRestaurantOwner) {
+    if (isStaff) {
         return (
             <div className="mx-auto max-w-lg px-4 py-16">
                 <EmptyState icon={<ShoppingBag size={26} />} title="Partner accounts can't order" body="Log in with a customer account to place orders." action={<LinkButton href="/dashboard">Go to dashboard</LinkButton>} />

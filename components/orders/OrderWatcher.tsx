@@ -42,11 +42,11 @@ function notify(title: string, body: string, url: string) {
  * wherever they are in the app. Also shows a slim "live order" bar so tracking is one tap away.
  */
 export function OrderWatcher() {
-    const { user, isRestaurantOwner } = useAuth();
+    const { user, isStaff } = useAuth();
     const pathname = usePathname();
     const router = useRouter();
     const toast = useToast();
-    const enabled = !!user && !isRestaurantOwner;
+    const enabled = !!user && !isStaff;
     const [visible, setVisible] = useState(true);
     const [hidden, setHidden] = useState(false);
     const [canAsk, setCanAsk] = useState(false);

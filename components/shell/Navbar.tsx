@@ -28,6 +28,10 @@ const customerLinks = [
     { href: "/planner", label: "Budget Bites" },
     { href: "/orders", label: "Orders", auth: true },
 ];
+const riderLinks = [
+    { href: "/rider", label: "Deliveries" },
+    { href: "/rider/profile", label: "Rider profile" },
+];
 const ownerLinks = [
     { href: "/dashboard", label: "Overview" },
     { href: "/dashboard/orders", label: "Kitchen" },
@@ -35,7 +39,7 @@ const ownerLinks = [
 ];
 
 export default function Navbar() {
-    const { user, isAuthenticated, isRestaurantOwner, logout } = useAuth();
+    const { user, isAuthenticated, isRestaurantOwner, isRider, isStaff, logout } = useAuth();
     const { count, open } = useCart();
     const { theme, toggle } = useTheme();
     const pathname = usePathname();
@@ -53,14 +57,14 @@ export default function Navbar() {
         return () => document.removeEventListener("mousedown", onClick);
     }, []);
 
-    const links = (isRestaurantOwner ? ownerLinks : customerLinks).filter((l) => !("auth" in l) || isAuthenticated);
+    const links = (isRestaurantOwner ? ownerLinks : isRider ? riderLinks : customerLinks).filter((l) => !("auth" in l) || isAuthenticated);
     const isActive = (href: string) =>
         href === "/dashboard" ? pathname === href : pathname === href || pathname.startsWith(href + "/");
 
     return (
         <header className="sticky top-0 z-40 border-b border-line/70 bg-bg/85 backdrop-blur-md">
             <div className="mx-auto flex h-16 max-w-7xl items-center gap-2 px-4 sm:gap-4 sm:px-6">
-                <Logo href={isRestaurantOwner ? "/dashboard" : "/"} />
+                <Logo href={isRestaurantOwner ? "/dashboard" : isRider ? "/rider" : "/"} />
 
                 <nav className="ml-4 hidden items-center gap-1 md:flex" aria-label="Main">
                     {links.map((l) => (
@@ -77,7 +81,7 @@ export default function Navbar() {
                     ))}
                 </nav>
 
-                {!isRestaurantOwner && (
+                {!isStaff && (
                     <form
                         role="search"
                         className="ml-auto hidden max-w-xs flex-1 lg:block"
@@ -99,7 +103,7 @@ export default function Navbar() {
                     </form>
                 )}
 
-                <div className={cn("flex items-center gap-0.5 sm:gap-1.5", isRestaurantOwner ? "ml-auto" : "ml-auto lg:ml-2")}>
+                <div className={cn("flex items-center gap-0.5 sm:gap-1.5", isStaff ? "ml-auto" : "ml-auto lg:ml-2")}>
                     <button
                         onClick={toggle}
                         aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
@@ -108,7 +112,7 @@ export default function Navbar() {
                         {theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}
                     </button>
 
-                    {!isRestaurantOwner && (
+                    {!isStaff && (
                         <button
                             onClick={open}
                             aria-label={`Open basket, ${count} items`}
@@ -144,11 +148,16 @@ export default function Navbar() {
                                     <div className="px-3 py-2">
                                         <p className="truncate font-semibold">{user.first_name || user.username}</p>
                                         <p className="text-sm text-muted">
-                                            {isRestaurantOwner ? "Restaurant partner" : `${user.loyalty_tier} member, ${user.loyalty_points} pts`}
+                                            {isRestaurantOwner ? "Restaurant partner" : isRider ? "Delivery rider" : `${user.loyalty_tier} member, ${user.loyalty_points} pts`}
                                         </p>
                                     </div>
                                     <div className="my-1 h-px bg-line" />
-                                    {(isRestaurantOwner
+                                    {(isRider
+                                        ? [
+                                              { href: "/rider", label: "Deliveries", icon: Receipt },
+                                              { href: "/rider/profile", label: "Rider profile", icon: User },
+                                          ]
+                                        : isRestaurantOwner
                                         ? [
                                               { href: "/dashboard", label: "Overview", icon: ChartLine },
                                               { href: "/dashboard/restaurants", label: "My restaurants", icon: Storefront },

@@ -244,7 +244,14 @@ export default function KitchenBoard() {
                                                         </p>
                                                     );
                                                 })()}
-                                                {o.status === "out_for_delivery" && <RiderBeacon order={o} />}
+                                                {o.rider_details ? (
+                                                    <p className="mt-2 flex items-center gap-2 rounded-lg bg-ok-soft px-2 py-1 text-xs font-semibold text-ok">
+                                                        🛵 {o.rider_details.name} {o.status === "out_for_delivery" ? "is delivering" : o.status === "ready" ? "is coming to pick up" : "will pick up"}
+                                                    </p>
+                                                ) : (
+                                                    o.status === "ready" && <p className="mt-2 rounded-lg bg-surface-2 px-2 py-1 text-xs text-muted">Waiting for a rider. Or hand it off yourself.</p>
+                                                )}
+                                                {o.status === "out_for_delivery" && !o.rider_details && <RiderBeacon order={o} />}
                                                 {o.estimated_delivery_at && o.status !== "pending" && (
                                                     <p className="mt-1 text-xs text-muted">Customer ETA {clock(o.estimated_delivery_at)}</p>
                                                 )}
@@ -253,9 +260,13 @@ export default function KitchenBoard() {
                                                     <span className="text-xs text-muted">{o.payment_method === "cash" ? "Cash" : "Card"} on delivery</span>
                                                 </div>
                                                 <div className="mt-3 flex gap-2">
-                                                    <Button size="sm" className="flex-1" loading={busy === o.id} onClick={() => (col.status === "pending" ? setAccepting(o) : advance(o, col.next))}>
-                                                        {col.action} <ArrowRight size={14} weight="bold" />
-                                                    </Button>
+                                                    {o.next_statuses && !o.next_statuses.includes(col.next) ? (
+                                                        <span className="flex-1 self-center text-xs text-muted">Rider handles {o.status === "ready" ? "pickup" : "delivery"}</span>
+                                                    ) : (
+                                                        <Button size="sm" className="flex-1" loading={busy === o.id} onClick={() => (col.status === "pending" ? setAccepting(o) : advance(o, col.next))}>
+                                                            {col.action} <ArrowRight size={14} weight="bold" />
+                                                        </Button>
+                                                    )}
                                                     <Link href={`/orders/${o.id}`} aria-label={`Open order ${o.id} and chat`} className="grid size-9 place-items-center rounded-full border border-line hover:border-brand hover:text-brand">
                                                         <ChatCircleDots size={18} />
                                                     </Link>

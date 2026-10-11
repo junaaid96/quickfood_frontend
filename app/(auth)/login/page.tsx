@@ -75,12 +75,15 @@ function LoginForm() {
                 <div className="mt-6 rounded-2xl border border-dashed border-line p-4">
                     <p className="text-sm font-semibold">🧪 Explore the demo</p>
                     <p className="mt-1 text-xs text-muted">One click signs you in. Password for every demo account: <code className="font-mono">quickfood123</code></p>
-                    <div className="mt-3 grid grid-cols-2 gap-2">
+                    <div className="mt-3 grid grid-cols-3 gap-2">
                         <Button variant="outline" size="sm" disabled={loading} onClick={() => submit("demo_customer", "quickfood123")}>
                             Demo customer
                         </Button>
                         <Button variant="outline" size="sm" disabled={loading} onClick={() => submit("demo_owner", "quickfood123")}>
                             Demo restaurant
+                        </Button>
+                        <Button variant="outline" size="sm" disabled={loading} onClick={() => submit("demo_rider", "quickfood123")}>
+                            Demo rider
                         </Button>
                     </div>
                 </div>
