@@ -138,7 +138,9 @@ export interface Order {
     delivery_address: string;
     delivery_option: DeliveryOption;
     delivery_option_label: string;
-    payment_method: "cash" | "card";
+    payment_method: PaymentMethod;
+    /** Payment state from PaySim BD (online) or the offline method. */
+    payment?: PaymentSummary;
     contact_phone: string;
     notes: string;
     promo_code: string | null;
@@ -292,4 +294,49 @@ export interface RiderProfile {
         today_earnings: number;
         active: number;
     };
+}
+
+/* ---- Payments (PaySim BD: simulated bKash, Nagad and SSLCommerz, no real money moves) ---- */
+export type OnlineGateway = "bkash" | "nagad" | "sslcommerz";
+export type PaymentMethod = "cash" | "card" | OnlineGateway;
+
+export interface PaymentConfig {
+    gateways: OnlineGateway[];
+    bdt_rate: string;
+    simulator: boolean;
+    simulator_url: string;
+}
+
+export interface PaymentRefund {
+    id: number;
+    amount: string;
+    amount_bdt: string;
+    status: "refunded" | "failed";
+    reference: string;
+    reason: string;
+    error: string;
+    automatic: boolean;
+    created_at: string;
+}
+
+export type PaymentStatus = "on_delivery" | "unpaid" | "paid" | "partially_refunded" | "refunded" | "failed" | "cancelled";
+
+export interface PaymentSummary {
+    method: PaymentMethod;
+    method_label?: string;
+    online: boolean;
+    status: PaymentStatus;
+    reference?: string;
+    trx_id?: string;
+    amount?: string;
+    amount_bdt?: string;
+    bdt_rate?: string;
+    paid_at?: string | null;
+    failure_reason?: string;
+    attempts?: number;
+    refunded_amount?: string;
+    refunded_bdt?: string;
+    refundable_amount?: string;
+    refunds?: PaymentRefund[];
+    simulator?: boolean;
 }

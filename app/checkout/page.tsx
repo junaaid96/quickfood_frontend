@@ -15,6 +15,7 @@ import {
     Moped,
     PencilSimple,
     Plus,
+    ShieldCheck,
     ShoppingBag,
     Tag,
     X,
@@ -22,7 +23,9 @@ import {
 import { ApiError, request } from "@/lib/api";
 import { useApi } from "@/lib/hooks";
 import { clock, cn, money, num } from "@/lib/format";
-import type { Address, DeliveryOption, Order, Promo, Quote } from "@/lib/types";
+import type { Address, DeliveryOption, Order, PaymentConfig, PaymentMethod, Promo, Quote } from "@/lib/types";
+import { GATEWAY_COPY, METHOD_LABEL, ONLINE_GATEWAYS, isOnline, startPayment, taka } from "@/lib/payments";
+import { GatewayMark } from "@/components/payments/GatewayMark";
 import { useAuth } from "@/providers/auth-provider";
 import { useCart } from "@/providers/cart-provider";
 import { useToast } from "@/providers/toast-provider";
@@ -49,6 +52,7 @@ export default function CheckoutPage() {
     const { user, isLoading: authLoading, isStaff, refreshUser } = useAuth();
 
     const { data: addresses, mutate: mutateAddresses } = useApi<Address[]>(user ? "/accounts/addresses/" : null);
+    const { data: payConfig } = useApi<PaymentConfig>("/payments/config/");
     const { data: promos } = useApi<Promo[]>(cart.restaurant ? `/orders/promos/?restaurant=${cart.restaurant.id}` : null);
 
     const [addressId, setAddressId] = useState<number | "new" | null>(null);
@@ -62,7 +66,8 @@ export default function CheckoutPage() {
     const [speed, setSpeed] = useState<DeliveryOption>("standard");
     const [tipPct, setTipPct] = useState<number | "custom">(10);
     const [customTip, setCustomTip] = useState("");
-    const [payment, setPayment] = useState<"cash" | "card">("cash");
+    const [payment, setPayment] = useState<PaymentMethod>("cash");
+    const [redirecting, setRedirecting] = useState<string | null>(null);
     const [promoInput, setPromoInput] = useState("");
     const [promo, setPromo] = useState("");
     const [usePoints, setUsePoints] = useState(false);
@@ -111,6 +116,17 @@ export default function CheckoutPage() {
         return () => clearTimeout(t);
     }, [user, orderItems, speed, promo, usePoints, tip, scheduledFor, isStaff]);
 
+    if (redirecting) {
+        return (
+                <div className="fixed inset-0 z-[70] grid place-items-center bg-bg/85 px-6 backdrop-blur-sm" role="status" aria-live="assertive">
+                    <div className="flex max-w-sm flex-col items-center text-center">
+                        <span className="size-10 animate-spin rounded-full border-4 border-line border-t-brand" aria-hidden />
+                        <p className="mt-4 text-lg font-bold">Order placed. Opening {redirecting}…</p>
+                        <p className="mt-1 text-sm text-muted">Finish the payment there and you&apos;ll come straight back to track your order.</p>
+                    </div>
+                </div>
+        );
+    }
     if (authLoading || !user) return <CheckoutSkeleton />;
     if (isStaff) {
         return (
@@ -158,6 +174,18 @@ export default function CheckoutPage() {
             });
             cart.clear();
             refreshUser();
+            if (isOnline(payment)) {
+                setRedirecting(METHOD_LABEL[payment]);
+                try {
+                    await startPayment(order.id, payment);
+                    return;
+                } catch (e) {
+                    // The order exists but isn't paid: the order page offers retry or cash.
+                    toast((e as Error).message, "error");
+                    router.push(`/orders/${order.id}?payment=failed`);
+                    return;
+                }
+            }
             router.push(`/orders/${order.id}?placed=1`);
         } catch (e) {
             const err = e as ApiError;
@@ -306,17 +334,42 @@ export default function CheckoutPage() {
                     </Section>
 
                     <Section title="Payment" icon={<CreditCard size={20} weight="fill" />}>
-                        <div className="grid grid-cols-2 gap-3">
-                            <OptionCard selected={payment === "cash"} onClick={() => setPayment("cash")}>
+                        <p className="-mt-2 mb-3 text-sm text-muted">Pay online now, or when your food arrives.</p>
+                        <div className="grid gap-3 sm:grid-cols-3" role="radiogroup" aria-label="Pay online">
+                            {ONLINE_GATEWAYS.map((g) => {
+                                const enabled = !payConfig || payConfig.gateways.includes(g);
+                                return (
+                                    <OptionCard key={g} selected={payment === g} onClick={() => enabled && setPayment(g)} className={cn("relative", !enabled && "pointer-events-none opacity-45")} role="radio">
+                                        {g === "bkash" && <span className="absolute -top-2.5 right-3 rounded-full bg-brand px-2 py-0.5 text-[11px] font-bold text-brand-ink">Popular</span>}
+                                        <GatewayMark method={g} />
+                                        <span className="mt-2 block font-semibold">{METHOD_LABEL[g]}</span>
+                                        <span className="block text-xs text-muted">{enabled ? GATEWAY_COPY[g].blurb : "Unavailable right now"}</span>
+                                    </OptionCard>
+                                );
+                            })}
+                        </div>
+                        <div className="mt-3 grid grid-cols-2 gap-3" role="radiogroup" aria-label="Pay on delivery">
+                            <OptionCard selected={payment === "cash"} onClick={() => setPayment("cash")} role="radio">
                                 <Money size={22} className="text-ok" />
                                 <span className="mt-2 block font-semibold">Cash on delivery</span>
+                                <span className="block text-xs text-muted">Pay the rider</span>
                             </OptionCard>
-                            <OptionCard selected={payment === "card"} onClick={() => setPayment("card")}>
+                            <OptionCard selected={payment === "card"} onClick={() => setPayment("card")} role="radio">
                                 <CreditCard size={22} className="text-brand" />
                                 <span className="mt-2 block font-semibold">Card on delivery</span>
                                 <span className="block text-xs text-muted">Rider brings a card machine</span>
                             </OptionCard>
                         </div>
+                        {isOnline(payment) && (
+                            <div className="mt-4 flex animate-rise items-start gap-3 rounded-2xl bg-surface-2 p-3 text-sm">
+                                <ShieldCheck size={20} weight="duotone" className="mt-0.5 shrink-0 text-brand" />
+                                <p className="text-muted">
+                                    <span className="font-semibold text-ink">{GATEWAY_COPY[payment].how}.</span> You&apos;ll be charged{" "}
+                                    <span className="tabular font-semibold text-ink">{quote ? taka(num(quote.total) * num(payConfig?.bdt_rate || 120)) : "…"}</span>, then sent back here. Payments run on{" "}
+                                    <a href="https://paysim-bd-codejborg.vercel.app" target="_blank" rel="noopener noreferrer" className="font-semibold text-brand hover:underline">PaySim BD</a>, an open-source simulator: no real money moves.
+                                </p>
+                            </div>
+                        )}
                     </Section>
                 </div>
 
@@ -432,9 +485,10 @@ export default function CheckoutPage() {
                             </p>
                         )}
                         <Button size="lg" className="mt-5 w-full" disabled={blocked} loading={placing} onClick={place}>
-                            {scheduledFor ? `Schedule for ${clock(scheduledFor)}` : "Place order"}
+                            {isOnline(payment) ? `Pay with ${METHOD_LABEL[payment]}` : scheduledFor ? `Schedule for ${clock(scheduledFor)}` : "Place order"}
                             {quote && <span className="tabular opacity-80">{money(quote.total)}</span>}
                         </Button>
+                        {isOnline(payment) && quote && <p className="tabular mt-2 text-center text-xs text-muted">≈ {taka(num(quote.total) * num(payConfig?.bdt_rate || 120))} charged by {METHOD_LABEL[payment]}{scheduledFor ? ` · delivery ${clock(scheduledFor)}` : ""}</p>}
                         {!deliveryAddress && <p className="mt-2 text-center text-xs text-muted">Add a delivery address to continue.</p>}
                         <p className="mt-3 text-center text-xs text-muted">
                             You can cancel for free until the kitchen confirms. <Link href="/orders" className="underline">Your orders</Link>
@@ -457,12 +511,14 @@ function Section({ title, icon, children }: { title: string; icon: React.ReactNo
     );
 }
 
-function OptionCard({ selected, onClick, children, className }: { selected: boolean; onClick: () => void; children: React.ReactNode; className?: string }) {
+function OptionCard({ selected, onClick, children, className, role }: { selected: boolean; onClick: () => void; children: React.ReactNode; className?: string; role?: "radio" }) {
     return (
         <button
             type="button"
             onClick={onClick}
-            aria-pressed={selected}
+            role={role}
+            aria-pressed={role ? undefined : selected}
+            aria-checked={role ? selected : undefined}
             className={cn(
                 "rounded-2xl border-2 p-4 text-left transition",
                 selected ? "border-brand bg-brand-soft/60" : "border-line bg-surface hover:border-ink/25",

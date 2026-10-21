@@ -1,4 +1,5 @@
 "use client";
+import { PaymentBadge } from "@/components/payments/PaymentBadge";
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
@@ -255,9 +256,9 @@ export default function KitchenBoard() {
                                                 {o.estimated_delivery_at && o.status !== "pending" && (
                                                     <p className="mt-1 text-xs text-muted">Customer ETA {clock(o.estimated_delivery_at)}</p>
                                                 )}
-                                                <div className="mt-3 flex items-center justify-between text-sm">
+                                                <div className="mt-3 flex items-center justify-between gap-2 text-sm">
                                                     <span className="tabular font-semibold">{money(o.total_price)}</span>
-                                                    <span className="text-xs text-muted">{o.payment_method === "cash" ? "Cash" : "Card"} on delivery</span>
+                                                    <PaymentBadge order={o} />
                                                 </div>
                                                 <div className="mt-3 flex gap-2">
                                                     {o.next_statuses && !o.next_statuses.includes(col.next) ? (

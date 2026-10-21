@@ -207,7 +207,7 @@ function DeliveryCard({ order: o, mine, busy, onAct, gps }: { order: Order; mine
                 <MapPin size={16} className="mt-0.5 shrink-0 text-brand" />
                 <div className="min-w-0">
                     <p className="font-semibold">
-                        {o.user_details.first_name || o.user_details.username} · {items} item{items === 1 ? "" : "s"} · {o.payment_method === "cash" ? `collect ${money(o.total_price)} cash` : "paid by card"}
+                        {o.user_details.first_name || o.user_details.username} · {items} item{items === 1 ? "" : "s"} · {o.payment_method === "cash" ? `collect ${money(o.total_price)} cash` : o.payment_method === "card" ? `take ${money(o.total_price)} by card machine` : `paid online via ${o.payment?.method_label ?? o.payment_method}, nothing to collect`}
                     </p>
                     <p className="text-muted">{o.delivery_address}</p>
                 </div>
