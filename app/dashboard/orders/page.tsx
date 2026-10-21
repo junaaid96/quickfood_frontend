@@ -241,7 +241,7 @@ export default function KitchenBoard() {
                                                     return (
                                                         <p className={cn("mt-2 flex items-center justify-between rounded-lg px-2 py-1 text-xs font-semibold", left < 0 ? "bg-danger-soft text-danger" : "bg-brand-soft text-brand")}>
                                                             <span>Prep {o.prep_minutes} min</span>
-                                                            <span className="tabular">{left < 0 ? `${-left} min over` : `${left} min left`}</span>
+                                                            <span className="tabular">{left < -60 ? "Overdue" : left < 0 ? `${-left} min over` : `${left} min left`}</span>
                                                         </p>
                                                     );
                                                 })()}
