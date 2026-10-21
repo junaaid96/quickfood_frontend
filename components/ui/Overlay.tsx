@@ -2,6 +2,7 @@
 
 import { X } from "@phosphor-icons/react";
 import { useEffect, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/format";
 
 function useOverlay(open: boolean, onClose: () => void) {
@@ -36,7 +37,7 @@ export function Modal({
 }) {
     useOverlay(open, onClose);
     if (!open) return null;
-    return (
+    return createPortal(
         <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-label={title}>
             <div className="absolute inset-0 bg-black/45 backdrop-blur-[2px]" onClick={onClose} />
             <div
@@ -56,19 +57,19 @@ export function Modal({
                 {children}
             </div>
         </div>
-    );
+    , document.body);
 }
 
 /** Right-hand drawer. */
 export function Drawer({ open, onClose, children, label }: { open: boolean; onClose: () => void; children: ReactNode; label: string }) {
     useOverlay(open, onClose);
     if (!open) return null;
-    return (
+    return createPortal(
         <div className="fixed inset-0 z-[60]" role="dialog" aria-modal="true" aria-label={label}>
             <div className="absolute inset-0 bg-black/45 backdrop-blur-[2px]" onClick={onClose} />
             <aside className="absolute inset-y-0 right-0 flex w-full max-w-md animate-slide-in flex-col bg-surface shadow-card">
                 {children}
             </aside>
         </div>
-    );
+    , document.body);
 }
