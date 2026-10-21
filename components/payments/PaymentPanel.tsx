@@ -123,10 +123,10 @@ export function PayNowCard({ order, onChanged }: { order: Order; onChanged: (o?:
                 })}
             </div>
             <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                <Button className="flex-1" loading={busy === "pay"} disabled={!!busy} onClick={pay}>
+                <Button className="w-full sm:flex-1" loading={busy === "pay"} disabled={!!busy} onClick={pay}>
                     Pay with {METHOD_LABEL[gateway]}
                 </Button>
-                <Button variant="outline" className="flex-1" loading={busy === "cash"} disabled={!!busy} onClick={cash} icon={<Money size={18} />}>
+                <Button variant="outline" className="w-full sm:flex-1" loading={busy === "cash"} disabled={!!busy} onClick={cash} icon={<Money size={18} />}>
                     Pay cash instead
                 </Button>
             </div>
