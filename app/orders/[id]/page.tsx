@@ -5,6 +5,7 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import {
     ArrowClockwise,
+    ArrowCounterClockwise,
     ArrowLeft,
     CalendarCheck,
     ChatCircleDots,
@@ -38,6 +39,8 @@ const LiveMap = dynamic(() => import("@/components/orders/LiveMap"), {
 });
 import { OrderChat } from "@/components/orders/OrderChat";
 import { SplitBill } from "@/components/orders/SplitBill";
+import { PayNowCard, PaymentReceipt, PaymentResultBanner, RefundDialog } from "@/components/payments/PaymentPanel";
+import { needsPayment } from "@/lib/payments";
 
 export default function OrderPage() {
     return (
@@ -49,7 +52,12 @@ export default function OrderPage() {
 
 function OrderDetail() {
     const { id } = useParams<{ id: string }>();
-    const placed = useSearchParams().get("placed") === "1";
+    const params = useSearchParams();
+    const placed = params.get("placed") === "1";
+    const rawOutcome = params.get("payment");
+    const outcome = rawOutcome === "success" || rawOutcome === "failed" || rawOutcome === "cancelled" || rawOutcome === "pending" ? rawOutcome : null;
+    const [refundOpen, setRefundOpen] = useState(false);
+    const [checked, setChecked] = useState(false);
     const { user, isRestaurantOwner, isRider } = useAuth();
     const toast = useToast();
     const { reorder, busy } = useReorder();
@@ -90,6 +98,17 @@ function OrderDetail() {
             document.title = prev;
         };
     }, [order]);
+
+    // Back from a gateway but not settled yet (interrupted redirect): ask the gateway once.
+    useEffect(() => {
+        if (checked || !order || !outcome || isRestaurantOwner || isRider) return;
+        setChecked(true);
+        if (order.payment?.online && order.payment.status === "unpaid") {
+            request<Order>("/payments/check/", { method: "POST", body: { order: order.id } })
+                .then((o) => mutate(o, { revalidate: false }))
+                .catch(() => null);
+        }
+    }, [checked, order, outcome, isRestaurantOwner, isRider, mutate]);
 
     if (error) {
         return (
@@ -132,7 +151,9 @@ function OrderDetail() {
                 <ArrowLeft size={16} /> {isRestaurantOwner ? "Kitchen board" : isRider ? "My deliveries" : "All orders"}
             </Link>
 
-            {placed && active && (
+            {outcome && !isRestaurantOwner && !isRider && <PaymentResultBanner order={order} outcome={outcome} />}
+
+            {placed && active && !outcome && !needsPayment(order) && (
                 <div className="mt-4 flex animate-rise items-center gap-3 rounded-2xl bg-ok-soft p-4 text-ok">
                     <Confetti size={26} weight="duotone" />
                     <p className="font-semibold">Order placed! We&apos;ll keep this page updated, no need to refresh.</p>
@@ -141,6 +162,7 @@ function OrderDetail() {
 
             <div className="mt-4 grid items-start gap-6 lg:grid-cols-[1.3fr_1fr]">
                 <div className="space-y-6">
+                    {needsPayment(order) && !isRestaurantOwner && !isRider && <PayNowCard order={order} onChanged={(o) => (o ? mutate(o, { revalidate: false }) : mutate())} />}
                     {/* Status hero */}
                     <Card className="overflow-hidden p-0 sm:p-0">
                         <div className="p-5 sm:p-6">
@@ -253,10 +275,16 @@ function OrderDetail() {
                             {num(order.points_discount) > 0 && <Row label={`${order.points_redeemed} points`} value={`-${money(order.points_discount)}`} good />}
                             {num(order.tip) > 0 && <Row label="Rider tip" value={money(order.tip)} />}
                             <div className="flex justify-between border-t border-line pt-3 text-base font-bold">
-                                <dt>Total · {order.payment_method === "cash" ? "Cash" : "Card"}</dt>
+                                <dt>Total</dt>
                                 <dd className="tabular">{money(order.total_price)}</dd>
                             </div>
                         </dl>
+                        <PaymentReceipt order={order} />
+                        {isRestaurantOwner && order.payment?.online && num(order.payment.refundable_amount) > 0 && (
+                            <Button variant="outline" size="sm" className="mt-3 w-full" icon={<ArrowCounterClockwise size={16} />} onClick={() => setRefundOpen(true)}>
+                                Refund payment
+                            </Button>
+                        )}
                         {order.delivery_option === "eco" && (
                             <p className="mt-4 flex items-center gap-2 rounded-2xl bg-ok-soft px-3 py-2 text-sm text-ok">
                                 <Leaf size={16} weight="fill" /> Wait & Save: shared ride, fewer trips.
@@ -294,7 +322,11 @@ function OrderDetail() {
             </div>
 
             <Modal open={cancelOpen} onClose={() => setCancelOpen(false)} title="Cancel this order?">
-                <p className="text-muted">The kitchen hasn&apos;t started yet, so there&apos;s no charge. Any points you used go straight back to your balance.</p>
+                <p className="text-muted">
+                    {order.payment?.status === "paid"
+                        ? `The kitchen hasn't started yet. Your ${order.payment.method_label} payment is refunded in full automatically, and any points you used go straight back to your balance.`
+                        : "The kitchen hasn't started yet, so there's no charge. Any points you used go straight back to your balance."}
+                </p>
                 <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                     <Button variant="outline" onClick={() => setCancelOpen(false)}>
                         Keep my order
@@ -304,6 +336,7 @@ function OrderDetail() {
                     </Button>
                 </div>
             </Modal>
+            {isRestaurantOwner && <RefundDialog order={order} open={refundOpen} onClose={() => setRefundOpen(false)} onDone={(o) => mutate(o, { revalidate: false })} />}
         </div>
     );
 }
