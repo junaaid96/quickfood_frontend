@@ -15,7 +15,7 @@ Backend repo: https://github.com/junaaid96/quickfood_backend
 - **Checkout**: saved addresses, ASAP or scheduled delivery, Priority / Standard / eco *Wait & Save* delivery, rider tips, promo codes, loyalty points. Every price is a live quote from the server.
 - **Live tracking**: status timeline, ETA countdown, illustrated route, chat with the kitchen, self-cancel while pending, split-the-bill calculator, rate and review, one-tap reorder.
 - **Rewards**: points on every order, Bronze to Platinum tiers.
-- **Dark mode**, mobile tab bar, reduced-motion support, and a notice when the API host is waking up.
+- Mobile tab bar, reduced-motion support, and a notice when the API host is waking up.
 
 ### For restaurant partners
 - **Overview**: revenue, orders, average order, rating, repeat customers, cancellation rate, busiest hour, daily revenue and hourly charts, top dishes, delivery mix, review replies.
@@ -25,7 +25,7 @@ Backend repo: https://github.com/junaaid96/quickfood_backend
 ## Tech Stack
 
 - **Next.js 15** (App Router), **React 19**, **TypeScript**
-- **Tailwind CSS 4** with design tokens for light and dark themes
+- **Tailwind CSS 4** with design tokens
 - **SWR** for data fetching, caching and live polling
 - **Phosphor Icons**
 - JWT auth with automatic token refresh
