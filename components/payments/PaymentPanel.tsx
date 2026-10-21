@@ -45,10 +45,16 @@ export function PaymentResultBanner({ order, outcome }: { order: Order; outcome:
             <XCircle size={26} weight="fill" className="shrink-0" />
             <div>
                 <p className="font-semibold">{outcome === "cancelled" ? "You cancelled the payment." : "The payment didn't go through."} Nothing was charged.</p>
-                <p className="text-sm opacity-90">{p?.failure_reason || "Try again, pick another method, or pay cash on delivery."}</p>
+                <p className="text-sm opacity-90">{friendlyReason(p?.failure_reason) || "Try again, pick another method, or pay cash on delivery."}</p>
             </div>
         </div>
     );
+}
+
+/** Gateway codes like "IPN FAILED" aren't meant for people; keep only readable reasons. */
+function friendlyReason(reason?: string) {
+    if (!reason || /^[A-Z_ ]+$/.test(reason) || /^IPN\b/i.test(reason)) return "";
+    return reason;
 }
 
 /** Customer: retry an online payment or switch to cash while the order is still pending. */

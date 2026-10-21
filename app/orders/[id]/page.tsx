@@ -120,7 +120,10 @@ function OrderDetail() {
     if (!order) return <OrderSkeleton />;
 
     const active = isActive(order.status);
-    const copy = STATUS_COPY[order.status];
+    const awaitingPayment = needsPayment(order);
+    const copy = awaitingPayment
+        ? { ...STATUS_COPY[order.status], title: "Waiting for payment", body: "Pay below, or switch to cash, and the kitchen gets your order right away." }
+        : STATUS_COPY[order.status];
     const progress = orderProgress(order, now);
     const baseEta = etaDisplay(order, now);
     const eta =
@@ -174,7 +177,7 @@ function OrderDetail() {
                                     <h1 className="mt-1 text-3xl font-extrabold">{copy.title}</h1>
                                     <p className="mt-1 text-muted">{copy.body}</p>
                                 </div>
-                                {active && eta && (
+                                {active && eta && !awaitingPayment && (
                                     <div className={cn("rounded-2xl px-4 py-3 text-right", eta.late ? "bg-warn-soft" : "bg-brand-soft")}>
                                         <p className={cn("text-xs font-semibold", eta.late ? "text-warn" : "text-brand")}>{order.status === "out_for_delivery" ? "Arriving in" : "Arriving"}</p>
                                         <p className={cn("tabular font-display text-2xl font-extrabold", eta.late ? "text-warn" : "text-brand")}>{eta.big}</p>
@@ -204,7 +207,7 @@ function OrderDetail() {
                                     Running a bit behind the estimate. The kitchen can see this too. Use the chat below if you need an update.
                                 </p>
                             )}
-                            {active && (
+                            {active && !awaitingPayment && (
                                 <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-valuenow={Math.round(progress * 100)} aria-valuemin={0} aria-valuemax={100}>
                                     <div className="h-full rounded-full bg-brand transition-all duration-1000" style={{ width: `${Math.max(4, progress * 100)}%` }} />
                                 </div>
