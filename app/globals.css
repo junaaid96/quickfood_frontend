@@ -148,3 +148,7 @@ h1, h2, h3, .font-display {
 @keyframes qf-pulse { from { transform: scale(0.7); opacity: 0.9; } to { transform: scale(1.6); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .leaflet-marker-icon.qf-pin-rider { transition: none; } .qf-rider-pulse.is-live { animation: none; } }
 .leaflet-container { font-family: inherit; background: var(--surface-2); }
+
+/* Leaflet panes use z-index 400–1000. Keep them inside the map's own stacking context so
+   dialogs, drawers, the navbar and toasts always sit above a map. */
+.leaflet-container { isolation: isolate; z-index: 0; }
