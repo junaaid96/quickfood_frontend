@@ -2,19 +2,23 @@ import { request } from "@/lib/api";
 import { num } from "@/lib/format";
 import type { OnlineGateway, Order, PaymentMethod, PaymentStatus } from "@/lib/types";
 
-export const ONLINE_GATEWAYS: OnlineGateway[] = ["bkash", "nagad", "sslcommerz"];
+export const ONLINE_GATEWAYS: OnlineGateway[] = ["bkash", "nagad", "rocket", "upay", "sslcommerz"];
 
 export const METHOD_LABEL: Record<PaymentMethod, string> = {
     cash: "Cash on delivery",
     card: "Card on delivery",
     bkash: "bKash",
     nagad: "Nagad",
+    rocket: "Rocket",
+    upay: "Upay",
     sslcommerz: "SSLCommerz",
 };
 
 export const GATEWAY_COPY: Record<OnlineGateway, { blurb: string; how: string }> = {
     bkash: { blurb: "Mobile wallet", how: "Wallet number, OTP and PIN on the bKash page" },
     nagad: { blurb: "Mobile wallet", how: "Account number, OTP and PIN on the Nagad page" },
+    rocket: { blurb: "DBBL mobile wallet", how: "Rocket wallet number and PIN on the DBBL page" },
+    upay: { blurb: "Mobile wallet", how: "Upay wallet number, OTP and PIN on the Upay page" },
     sslcommerz: { blurb: "Cards, wallets, net banking", how: "Choose a card or wallet on the SSLCommerz page" },
 };
 

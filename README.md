@@ -1,6 +1,6 @@
 # QuickFood - Frontend
 
-QuickFood is a food delivery platform built with Next.js. Customers discover local kitchens, plan meals around a budget, check out with transparent pricing, pay online with bKash, Nagad or SSLCommerz (through [PaySim BD](https://github.com/junaaid96/paysim-bd)) and track orders live. Restaurant partners run a live kitchen board, manage menus and read analytics.
+QuickFood is a food delivery platform built with Next.js. Customers discover local kitchens, plan meals around a budget, check out with transparent pricing, pay online with bKash, Nagad, Rocket, Upay or SSLCommerz (through [PaySim BD](https://github.com/junaaid96/paysim-bd)) and track orders live. Restaurant partners run a live kitchen board, manage menus and read analytics.
 
 Live: https://quickfood-frontend.vercel.app/
 Backend repo: https://github.com/junaaid96/quickfood_backend
@@ -13,7 +13,7 @@ Backend repo: https://github.com/junaaid96/quickfood_backend
 - **Restaurant pages**: sticky category navigation with scrollspy, in-menu search, dietary and spice tags, "most ordered" badges, verified reviews with rating breakdown and owner replies.
 - **Persistent basket**: survives reloads, per-item notes, minimum order progress, and a guard against mixing kitchens.
 - **Checkout**: saved addresses, ASAP or scheduled delivery, Priority / Standard / eco *Wait & Save* delivery, rider tips, promo codes, loyalty points. Every price is a live quote from the server.
-- **Online payments (PaySim BD)**: pay with bKash, Nagad or SSLCommerz, or cash / card on delivery. The checkout shows the taka amount, opens the gateway's hosted page and brings you back to the order with a clear result: paid, failed or cancelled. Retry on any gateway or switch to cash while the order is pending. The receipt shows the reference, transaction ID and any refunds. [PaySim BD](https://github.com/junaaid96/paysim-bd) is an open-source simulator of the real gateway APIs, so no real money moves.
+- **Online payments (PaySim BD)**: pay with bKash, Nagad, Rocket, Upay or SSLCommerz, or cash / card on delivery. The checkout shows the taka amount, opens the gateway's hosted page and brings you back to the order with a clear result: paid, failed or cancelled. Retry on any gateway or switch to cash while the order is pending. The receipt shows the reference, transaction ID and any refunds. [PaySim BD](https://github.com/junaaid96/paysim-bd) is an open-source simulator of the real gateway APIs, so no real money moves.
 - **Live tracking**: status timeline, ETA countdown, illustrated route, chat with the kitchen, self-cancel while pending, split-the-bill calculator, rate and review, one-tap reorder.
 - **Rewards**: points on every order, Bronze to Platinum tiers.
 - Mobile tab bar, reduced-motion support, and a notice when the API host is waking up.
