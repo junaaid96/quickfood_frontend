@@ -296,8 +296,8 @@ export interface RiderProfile {
     };
 }
 
-/* ---- Payments (PaySim BD: simulated bKash, Nagad and SSLCommerz, no real money moves) ---- */
-export type OnlineGateway = "bkash" | "nagad" | "sslcommerz";
+/* ---- Payments (PaySim BD: simulated bKash, Nagad, Rocket, Upay and SSLCommerz, no real money moves) ---- */
+export type OnlineGateway = "bkash" | "nagad" | "rocket" | "upay" | "sslcommerz";
 export type PaymentMethod = "cash" | "card" | OnlineGateway;
 
 export interface PaymentConfig {

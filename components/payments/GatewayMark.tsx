@@ -6,6 +6,8 @@ import type { PaymentMethod } from "@/lib/types";
 const MARK: Record<string, { text: string; className: string }> = {
     bkash: { text: "bKash", className: "bg-[#E2136E] text-white" },
     nagad: { text: "Nagad", className: "bg-[#F6921E] text-white" },
+    rocket: { text: "Rocket", className: "bg-[#8C3494] text-white" },
+    upay: { text: "Upay", className: "bg-[#FFD100] text-[#0B2A6F]" },
     sslcommerz: { text: "SSL", className: "bg-[#1A5DAB] text-white" },
 };
 
